@@ -1,7 +1,12 @@
 from typing import Final
 import arcade
+from textures import *
+
 
 from constants import *
+
+def grid_to_pixels(i: int) -> int:
+    return i * TILE_SIZE + (TILE_SIZE // 2)
 
 class GameView(arcade.View):
     """Main in-game view."""
@@ -12,6 +17,10 @@ class GameView(arcade.View):
     def __init__(self) -> None:
         # Magical incantion: initialize the Arcade view
         super().__init__()
+        self.player = arcade.Sprite(
+            TEXTURE_PLAYER_IDLE_DOWN,
+            scale=SCALE, center_x=grid_to_pixels(2), center_y=grid_to_pixels(2)
+        )
 
         # Choose a nice comfy background color
         self.background_color = arcade.csscolor.CORNFLOWER_BLUE
@@ -31,3 +40,5 @@ class GameView(arcade.View):
     def on_draw(self) -> None:
          """Render the screen."""
          self.clear() # always start with self.clear()
+         arcade.draw_sprite(self.player)
+         arcade.draw_sprite(self.player)
