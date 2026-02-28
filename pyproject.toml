@@ -7,3 +7,8 @@ requires-python = ">=3.14"
 dependencies = [
     "arcade>=3.3.3",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
