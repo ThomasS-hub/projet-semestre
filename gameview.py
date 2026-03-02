@@ -9,6 +9,11 @@ from textures import SOUND_COIN
 
 from constants import *
 
+LEFT_MARGIN = 200
+RIGHT_MARGIN = 200
+BOTTOM_MARGIN = 200
+TOP_MARGIN = 200
+
 def grid_to_pixels(i: int) -> int:
     return i * TILE_SIZE + (TILE_SIZE // 2)
 
@@ -72,6 +77,10 @@ class GameView(arcade.View):
         # Setup our game
         self.world_width = 40 * TILE_SIZE
         self.world_height = 20 * TILE_SIZE
+        self.left_pressed = False
+        self.right_pressed = False
+        self.up_pressed = False
+        self.down_pressed = False
 
     def on_show_view(self) -> None:
         """Called automatically by 'window.show_view(game_view)' in main.py."""
@@ -80,6 +89,13 @@ class GameView(arcade.View):
         # limit the size of the window.
         self.window.width = min(MAX_WINDOW_WIDTH, self.world_width)
         self.window.height = min(MAX_WINDOW_HEIGHT, self.world_height)
+        w = self.window.width
+        h = self.window.height
+
+        cx = min(max(self.player.center_x, w/2), self.world_width - w/2)
+        cy = min(max(self.player.center_y, h/2), self.world_height - h/2)
+
+        self.camera.position = (cx, cy)
 
     def on_draw(self) -> None:
          """Render the screen."""
@@ -91,41 +107,76 @@ class GameView(arcade.View):
                 self.player_list.draw()
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
-        """Called when the user presses a key on the keyboard."""
         match symbol:
             case arcade.key.RIGHT:
-                # start moving to the right
-                self.player.change_x = +PLAYER_MOVEMENT_SPEED
+                self.right_pressed = True
             case arcade.key.LEFT:
-                # start moving to the left
-                self.player.change_x = -PLAYER_MOVEMENT_SPEED
+                self.left_pressed = True
             case arcade.key.UP:
-                # start moving upwards
-                self.player.change_y = +PLAYER_MOVEMENT_SPEED
+                self.up_pressed = True
             case arcade.key.DOWN:
-                # start moving downwards
-                self.player.change_y = -PLAYER_MOVEMENT_SPEED
+                self.down_pressed = True
             case arcade.key.ESCAPE:
                 self.window.show_view(GameView())
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
-        """Called when the user releases a key on the keyboard."""
         match symbol:
-            case arcade.key.RIGHT | arcade.key.LEFT:
-                # stop horizontal movement
-                self.player.change_x = 0
-            case arcade.key.UP | arcade.key.DOWN:
-                # stop vertical movement
-                self.player.change_y = 0
+            case arcade.key.RIGHT:
+                self.right_pressed = False
+            case arcade.key.LEFT:
+                self.left_pressed = False
+            case arcade.key.UP:
+                self.up_pressed = False
+            case arcade.key.DOWN:
+                self.down_pressed = False
+
+    def _update_camera(self) -> None:
+        cam_cx, cam_cy = self.camera.position  # CENTRE
+        w = self.window.width
+        h = self.window.height
+
+        # Convertir en coin bas-gauche du viewport
+        cam_left = cam_cx - w / 2
+        cam_bottom = cam_cy - h / 2
+
+        left_boundary = cam_left + LEFT_MARGIN
+        right_boundary = cam_left + w - RIGHT_MARGIN
+        bottom_boundary = cam_bottom + BOTTOM_MARGIN
+        top_boundary = cam_bottom + h - TOP_MARGIN
+
+        # X
+        if self.player.left < left_boundary:
+            cam_left = self.player.left - LEFT_MARGIN
+        elif self.player.right > right_boundary:
+            cam_left = self.player.right - (w - RIGHT_MARGIN)
+
+        # Y
+        if self.player.bottom < bottom_boundary:
+            cam_bottom = self.player.bottom - BOTTOM_MARGIN
+        elif self.player.top > top_boundary:
+            cam_bottom = self.player.top - (h - TOP_MARGIN)
+
+        # Clamp sur le coin bas-gauche
+        max_left = max(0, self.world_width - w)
+        max_bottom = max(0, self.world_height - h)
+
+        cam_left = min(max(cam_left, 0), max_left)
+        cam_bottom = min(max(cam_bottom, 0), max_bottom)
+
+        # Reconvertir en CENTRE
+        self.camera.position = (cam_left + w / 2, cam_bottom + h / 2)
+
     def on_update(self, delta_time: float) -> None:
         """Called once per frame, before drawing.
 
         This is where in-world time "advances", or "ticks".
         """
+        self.player.change_x = PLAYER_MOVEMENT_SPEED * (self.right_pressed - self.left_pressed)
+        self.player.change_y = PLAYER_MOVEMENT_SPEED * (self.up_pressed - self.down_pressed)
         self.physics_engine.update()
         self.crystals.update_animation()
         self.player.update_animation()
-        self.camera.position = self.player.position
+        self._update_camera()
         hit_list = arcade.check_for_collision_with_list(self.player, self.crystals)
         for crystal in hit_list:
             arcade.play_sound(SOUND_COIN)

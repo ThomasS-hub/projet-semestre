@@ -1,5 +1,11 @@
 from typing import Final
+from pathlib import Path
 import arcade
+
+ROOT = Path(__file__).resolve().parent
+
+def asset_path(rel: str) -> str:
+    return str(ROOT / rel)
 
 ORIG_TILE_SIZE = (16, 16)
 
@@ -58,15 +64,15 @@ def _load_animation_strip(
     keyframes = [arcade.TextureKeyframe(frame, frame_duration) for frame in grid]
     return arcade.TextureAnimation(keyframes)
 
-_overworld_grid = _load_grid("assets/Top_Down_Adventure_Pack_v.1.0/Overworld_Tileset.png", 18, 13)
+_overworld_grid = _load_grid(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Overworld_Tileset.png"), 18, 13)
 
 TEXTURE_GRASS: Final[arcade.Texture] = _overworld_grid[18*1 + 6]
 TEXTURE_BUSH: Final[arcade.Texture] = _overworld_grid[18*3 + 5]
 CRYSTAL_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
-   "assets/Top_Down_Adventure_Pack_v.1.0/Props_Items_(animated)/crystal_item_anim_strip_6.png",
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Props_Items_(animated)/crystal_item_anim_strip_6.png"),
     frame_count=6,
 )
 CRYSTAL_TEXTURES = [kf.texture for kf in CRYSTAL_ANIM.keyframes]
 ANIMATION_PLAYER_IDLE_DOWN: Final[arcade.TextureAnimation] = \
-    _load_animation_strip("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_down_anim_strip_6.png", 6)
+    _load_animation_strip(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_down_anim_strip_6.png"), 6)
 SOUND_COIN: Final[arcade.Sound] = arcade.load_sound(":resources:sounds/coin5.wav", streaming=False)
