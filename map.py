@@ -6,6 +6,8 @@ class GridCell(Enum):
     GRASS = 0
     BUSH = 1
     CRYSTAL = 2
+    SPINNER_HORIZONTAL = 3
+    SPINNER_VERTICAL = 4
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,12 @@ def _make_map_decouverte() -> Map:
     # cristaux (comme avant)
     for (x, y) in [(5, 2), (6, 5), (3, 5)]:
         grid[y][x] = GridCell.CRYSTAL
+    # spinners
+    for (x, y) in [(10, 5), (15, 8)]:
+        grid[y][x] = GridCell.SPINNER_HORIZONTAL
+
+    for (x, y) in [(20, 10), (25, 4)]:
+        grid[y][x] = GridCell.SPINNER_VERTICAL
 
     return Map(
         width=width,

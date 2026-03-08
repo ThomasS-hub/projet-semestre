@@ -5,6 +5,7 @@ import arcade
 from textures import *
 from textures import SOUND_COIN
 from map import Map, GridCell
+from dataclasses import dataclass
 
 
 
@@ -18,6 +19,14 @@ TOP_MARGIN = 200
 def grid_to_pixels(i: int) -> int:
     return i * TILE_SIZE + (TILE_SIZE // 2)
 
+@dataclass
+class SpinnerInfo:
+    sprite: arcade.Sprite
+    horizontal: bool
+    min_pos: int
+    max_pos: int
+    speed: int
+
 class GameView(arcade.View):
     """Main in-game view."""
 
@@ -30,6 +39,8 @@ class GameView(arcade.View):
     walls: Final[arcade.SpriteList]
     crystals: Final[arcade.SpriteList]
     keys_down: set[int]
+    spinners: Final[arcade.SpriteList]
+    spinners_info: list[SpinnerInfo]
 
 
     physics_engine: Final[arcade.PhysicsEngineSimple]
@@ -49,6 +60,8 @@ class GameView(arcade.View):
         self.grounds = arcade.SpriteList(use_spatial_hash=True)
         self.walls = arcade.SpriteList(use_spatial_hash=True)
         self.crystals = arcade.SpriteList(use_spatial_hash=True)
+        self.spinners = arcade.SpriteList()
+        self.spinners_info = []
         for x in range(self.map.width):
             for y in range(self.map.height):
                 cell = self.map.get_cell(x, y)
@@ -70,6 +83,40 @@ class GameView(arcade.View):
                     crystal.center_x = grid_to_pixels(x)
                     crystal.center_y = grid_to_pixels(y)
                     self.crystals.append(crystal)
+                elif cell == GridCell.SPINNER_HORIZONTAL:
+                    spinner = arcade.Sprite(scale=SCALE)
+                    spinner.textures = SPINNER_TEXTURES
+                    spinner.texture = SPINNER_TEXTURES[0]
+                    spinner.center_x = grid_to_pixels(x)
+                    spinner.center_y = grid_to_pixels(y)
+                    self.spinners.append(spinner)
+                    min_x, max_x = self._spinner_horizontal_limits(x, y)
+                    self.spinners_info.append(
+                        SpinnerInfo(
+                            sprite=spinner,
+                            horizontal=True,
+                            min_pos=grid_to_pixels(min_x),
+                            max_pos=grid_to_pixels(max_x),
+                            speed=3,
+                        )
+                    )
+                elif cell == GridCell.SPINNER_VERTICAL:
+                    spinner = arcade.Sprite(scale=SCALE)
+                    spinner.textures = SPINNER_TEXTURES
+                    spinner.texture = SPINNER_TEXTURES[0]
+                    spinner.center_x = grid_to_pixels(x)
+                    spinner.center_y = grid_to_pixels(y)
+                    self.spinners.append(spinner)
+                    min_y, max_y = self._spinner_vertical_limits(x, y)
+                    self.spinners_info.append(
+                        SpinnerInfo(
+                            sprite=spinner,
+                            horizontal=False,
+                            min_pos=grid_to_pixels(min_y),
+                            max_pos=grid_to_pixels(max_y),
+                            speed=3,
+                        )
+                    )
 
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, self.walls)
         self.camera = arcade.camera.Camera2D()
@@ -84,6 +131,29 @@ class GameView(arcade.View):
         self.right_pressed = False
         self.up_pressed = False
         self.down_pressed = False
+
+    def _spinner_horizontal_limits(self, x: int, y: int) -> tuple[int, int]:
+        left = x
+        while left - 1 >= 0 and self.map.get_cell(left - 1, y) != GridCell.BUSH:
+            left -= 1
+
+        right = x
+        while right + 1 < self.map.width and self.map.get_cell(right + 1, y) != GridCell.BUSH:
+            right += 1
+
+        return left, right
+
+
+    def _spinner_vertical_limits(self, x: int, y: int) -> tuple[int, int]:
+        down = y
+        while down - 1 >= 0 and self.map.get_cell(x, down - 1) != GridCell.BUSH:
+            down -= 1
+
+        up = y
+        while up + 1 < self.map.height and self.map.get_cell(x, up + 1) != GridCell.BUSH:
+            up += 1
+
+        return down, up
 
     def on_show_view(self) -> None:
         """Called automatically by 'window.show_view(game_view)' in main.py."""
@@ -107,7 +177,9 @@ class GameView(arcade.View):
                 self.grounds.draw()
                 self.walls.draw()
                 self.crystals.draw()
+                self.spinners.draw()
                 self.player_list.draw()
+
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
         match symbol:
@@ -184,3 +256,29 @@ class GameView(arcade.View):
         for crystal in hit_list:
             arcade.play_sound(SOUND_COIN)
             crystal.remove_from_sprite_lists()
+        self.spinners.update()
+        for info in self.spinners_info:
+            if info.horizontal:
+                info.sprite.center_x += info.speed
+
+                if info.sprite.center_x >= info.max_pos:
+                    info.sprite.center_x = info.max_pos
+                    info.speed *= -1
+                elif info.sprite.center_x <= info.min_pos:
+                    info.sprite.center_x = info.min_pos
+                    info.speed *= -1
+            else:
+                info.sprite.center_y += info.speed
+
+                if info.sprite.center_y >= info.max_pos:
+                    info.sprite.center_y = info.max_pos
+                    info.speed *= -1
+                elif info.sprite.center_y <= info.min_pos:
+                    info.sprite.center_y = info.min_pos
+                    info.speed *= -1
+
+        self.spinners.update_animation()
+
+        if arcade.check_for_collision_with_list(self.player, self.spinners):
+            self.window.show_view(GameView(self.map))
+            return

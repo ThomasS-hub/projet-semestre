@@ -76,3 +76,8 @@ CRYSTAL_TEXTURES = [kf.texture for kf in CRYSTAL_ANIM.keyframes]
 ANIMATION_PLAYER_IDLE_DOWN: Final[arcade.TextureAnimation] = \
     _load_animation_strip(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_down_anim_strip_6.png"), 6)
 SOUND_COIN: Final[arcade.Sound] = arcade.load_sound(":resources:sounds/coin5.wav", streaming=False)
+SPINNER_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Enemies_Sprites/Spinner_Sprites/spinner_run_attack_anim_all_dir_strip_8.png"),
+    frame_count=3
+)
+SPINNER_TEXTURES = [kf.texture for kf in SPINNER_ANIM.keyframes] #Extract the textures from the animation keyframes so they can be assigned to sprite.textures
