@@ -6,9 +6,7 @@ from textures import *
 from textures import SOUND_COIN
 from map import Map, GridCell
 from dataclasses import dataclass
-
-
-
+from enum import IntEnum
 from constants import *
 
 LEFT_MARGIN = 200
@@ -26,6 +24,67 @@ class SpinnerInfo:
     min_pos: int
     max_pos: int
     speed: int
+class Direction(IntEnum):
+    North = 0
+    South = 1
+    West = 2
+    East = 3
+
+class Player(arcade.TextureAnimationSprite):
+    direction: Direction
+
+    def __init__(self) -> None:
+        super().__init__(animation=ANIMATION_PLAYER_IDLE_DOWN, scale=SCALE)
+        self.direction = Direction.South
+        self.idle_animations = [
+            ANIMATION_PLAYER_IDLE_UP,
+            ANIMATION_PLAYER_IDLE_DOWN,
+            ANIMATION_PLAYER_IDLE_LEFT,
+            ANIMATION_PLAYER_IDLE_RIGHT,
+        ]
+        self.run_animations = [
+            ANIMATION_PLAYER_RUN_UP,
+            ANIMATION_PLAYER_RUN_DOWN,
+            ANIMATION_PLAYER_RUN_LEFT,
+            ANIMATION_PLAYER_RUN_RIGHT,
+        ]
+        self.animation = self.idle_animations[self.direction]
+        self.texture = self.animation.keyframes[0].texture
+
+    def on_key_press(self, symbol: int, modifiers: int) -> None:
+        match symbol:
+            case arcade.key.RIGHT:
+                self.change_x = PLAYER_MOVEMENT_SPEED
+                self.direction = Direction.East
+            case arcade.key.LEFT:
+                self.change_x = -PLAYER_MOVEMENT_SPEED
+                self.direction = Direction.West
+            case arcade.key.UP:
+                self.change_y = PLAYER_MOVEMENT_SPEED
+                self.direction = Direction.North
+            case arcade.key.DOWN:
+                self.change_y = -PLAYER_MOVEMENT_SPEED
+                self.direction = Direction.South
+    def on_key_release(self, symbol: int, modifiers: int) -> None:
+        match symbol:
+            case arcade.key.RIGHT:
+                self.change_x = 0
+            case arcade.key.LEFT:
+                self.change_x = 0
+            case arcade.key.UP:
+                self.change_y = 0
+            case arcade.key.DOWN:
+                self.change_y = 0
+
+    def update_animation_state(self, delta_time: float) -> None:
+        if self.change_x == 0 and self.change_y == 0:
+            self.animation = self.idle_animations[self.direction]
+        else:
+            self.animation = self.run_animations[self.direction]
+
+        super().update_animation(delta_time)
+
+
 
 class GameView(arcade.View):
     """Main in-game view."""
@@ -33,14 +92,18 @@ class GameView(arcade.View):
     world_width: Final[int]
     world_height: Final[int]
 
-    player: Final[arcade.TextureAnimationSprite]
-    player_list: Final[arcade.SpriteList[arcade.TextureAnimationSprite]]
+    player: Final[Player]
+    player_list: Final[arcade.SpriteList[Player]]
     grounds: Final[arcade.SpriteList]
     walls: Final[arcade.SpriteList]
     crystals: Final[arcade.SpriteList]
     keys_down: set[int]
     spinners: Final[arcade.SpriteList]
     spinners_info: list[SpinnerInfo]
+    holes: Final[arcade.SpriteList]
+    ui_camera: Final[arcade.camera.Camera2D]
+    score: int
+    score_text: arcade.Text
 
 
     physics_engine: Final[arcade.PhysicsEngineSimple]
@@ -51,10 +114,9 @@ class GameView(arcade.View):
         # Magical incantion: initialize the Arcade view
         super().__init__()
         self.map = map
-        self.player = arcade.TextureAnimationSprite(
-            animation=ANIMATION_PLAYER_IDLE_DOWN,
-            scale=SCALE, center_x=grid_to_pixels(map.player_start_x), center_y=grid_to_pixels(map.player_start_y)
-        )
+        self.player = Player()
+        self.player.center_x = grid_to_pixels(map.player_start_x)
+        self.player.center_y = grid_to_pixels(map.player_start_y)
         self.player_list = arcade.SpriteList()
         self.player_list.append(self.player)
         self.grounds = arcade.SpriteList(use_spatial_hash=True)
@@ -62,6 +124,15 @@ class GameView(arcade.View):
         self.crystals = arcade.SpriteList(use_spatial_hash=True)
         self.spinners = arcade.SpriteList()
         self.spinners_info = []
+        self.holes = arcade.SpriteList(use_spatial_hash=True)
+        self.ui_camera = arcade.camera.Camera2D()
+        self.score = 0
+        self.score_text = arcade.Text(text=f"Score: {self.score}",
+            x=20,
+            y=self.window.height - 40 if self.window else 20,
+            color=arcade.color.WHITE,
+            font_size=20,
+        )
         for x in range(self.map.width):
             for y in range(self.map.height):
                 cell = self.map.get_cell(x, y)
@@ -117,6 +188,12 @@ class GameView(arcade.View):
                             speed=3,
                         )
                     )
+                elif cell == GridCell.HOLE:
+                    hole = arcade.Sprite(
+                        TEXTURE_HOLE, scale=SCALE,
+                        center_x=grid_to_pixels(x), center_y=grid_to_pixels(y)
+                    )
+                    self.holes.append(hole)
 
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, self.walls)
         self.camera = arcade.camera.Camera2D()
@@ -127,10 +204,6 @@ class GameView(arcade.View):
         # Setup our game
         self.world_width = self.map.width * TILE_SIZE
         self.world_height = self.map.height * TILE_SIZE
-        self.left_pressed = False
-        self.right_pressed = False
-        self.up_pressed = False
-        self.down_pressed = False
 
     def _spinner_horizontal_limits(self, x: int, y: int) -> tuple[int, int]:
         left = x
@@ -154,6 +227,13 @@ class GameView(arcade.View):
             up += 1
 
         return down, up
+    def _player_falls_into_hole(self) -> bool:
+        for hole in arcade.get_sprites_at_point(self.player.position, self.holes): #permet de tester seulement les trous qui sont proches du joueur
+            dx = self.player.center_x - hole.center_x
+            dy = self.player.center_y - hole.center_y
+            if dx * dx + dy * dy <= 16 * 16:
+                return True
+        return False
 
     def on_show_view(self) -> None:
         """Called automatically by 'window.show_view(game_view)' in main.py."""
@@ -172,38 +252,24 @@ class GameView(arcade.View):
 
     def on_draw(self) -> None:
          """Render the screen."""
-         self.clear() # always start with self.clear()
+         self.clear()
          with self.camera.activate():
                 self.grounds.draw()
+                self.holes.draw()
                 self.walls.draw()
                 self.crystals.draw()
                 self.spinners.draw()
                 self.player_list.draw()
-
-
+         with self.ui_camera.activate():
+            self.score_text.y = self.window.height - 40
+            self.score_text.draw()
     def on_key_press(self, symbol: int, modifiers: int) -> None:
-        match symbol:
-            case arcade.key.RIGHT:
-                self.right_pressed = True
-            case arcade.key.LEFT:
-                self.left_pressed = True
-            case arcade.key.UP:
-                self.up_pressed = True
-            case arcade.key.DOWN:
-                self.down_pressed = True
-            case arcade.key.ESCAPE:
-                self.window.show_view(GameView())
-
+        if symbol == arcade.key.ESCAPE:
+            self.window.show_view(GameView(self.map))
+            return
+        self.player.on_key_press(symbol, modifiers)
     def on_key_release(self, symbol: int, modifiers: int) -> None:
-        match symbol:
-            case arcade.key.RIGHT:
-                self.right_pressed = False
-            case arcade.key.LEFT:
-                self.left_pressed = False
-            case arcade.key.UP:
-                self.up_pressed = False
-            case arcade.key.DOWN:
-                self.down_pressed = False
+        self.player.on_key_release(symbol, modifiers)
 
     def _update_camera(self) -> None:
         cam_cx, cam_cy = self.camera.position  # CENTRE
@@ -246,16 +312,16 @@ class GameView(arcade.View):
 
         This is where in-world time "advances", or "ticks".
         """
-        self.player.change_x = PLAYER_MOVEMENT_SPEED * (self.right_pressed - self.left_pressed)
-        self.player.change_y = PLAYER_MOVEMENT_SPEED * (self.up_pressed - self.down_pressed)
         self.physics_engine.update()
         self.crystals.update_animation()
-        self.player.update_animation()
+        self.player.update_animation_state(delta_time)
         self._update_camera()
         hit_list = arcade.check_for_collision_with_list(self.player, self.crystals)
         for crystal in hit_list:
             arcade.play_sound(SOUND_COIN)
             crystal.remove_from_sprite_lists()
+            self.score += 1
+            self.score_text.text = f"Score: {self.score}"
         self.spinners.update()
         for info in self.spinners_info:
             if info.horizontal:
@@ -276,6 +342,9 @@ class GameView(arcade.View):
                 elif info.sprite.center_y <= info.min_pos:
                     info.sprite.center_y = info.min_pos
                     info.speed *= -1
+        if self._player_falls_into_hole():
+            self.window.show_view(GameView(self.map))
+            return
 
         self.spinners.update_animation()
 

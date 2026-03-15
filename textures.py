@@ -1,3 +1,4 @@
+from arcade.examples.particle_fireworks import TEXTURE
 from typing import Final
 from pathlib import Path
 import arcade
@@ -68,6 +69,7 @@ _overworld_grid = _load_grid(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Ov
 
 TEXTURE_GRASS: Final[arcade.Texture] = _overworld_grid[18*1 + 6]
 TEXTURE_BUSH: Final[arcade.Texture] = _overworld_grid[18*3 + 5]
+TEXTURE_HOLE: Final[arcade.Texture] = _overworld_grid[18*4 + 8]
 CRYSTAL_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
     asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Props_Items_(animated)/crystal_item_anim_strip_6.png"),
     frame_count=6,
@@ -75,6 +77,34 @@ CRYSTAL_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
 CRYSTAL_TEXTURES = [kf.texture for kf in CRYSTAL_ANIM.keyframes]
 ANIMATION_PLAYER_IDLE_DOWN: Final[arcade.TextureAnimation] = \
     _load_animation_strip(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_down_anim_strip_6.png"), 6)
+ANIMATION_PLAYER_IDLE_UP: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_up_anim_strip_6.png"),6)
+
+ANIMATION_PLAYER_IDLE_LEFT: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_left_anim_strip_6.png"),6)
+
+ANIMATION_PLAYER_IDLE_RIGHT: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_idle_right_anim_strip_6.png"),6)
+
+ANIMATION_PLAYER_RUN_DOWN: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+        asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_run_down_anim_strip_6.png"), 6)
+
+ANIMATION_PLAYER_RUN_UP: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+        asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_run_up_anim_strip_6.png"), 6)
+
+ANIMATION_PLAYER_RUN_LEFT: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+        asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_run_left_anim_strip_6.png"), 6 )
+
+ANIMATION_PLAYER_RUN_RIGHT: Final[arcade.TextureAnimation] = \
+    _load_animation_strip(
+        asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_run_right_anim_strip_6.png"), 6 )
+
 SOUND_COIN: Final[arcade.Sound] = arcade.load_sound(":resources:sounds/coin5.wav", streaming=False)
 SPINNER_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
     asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Enemies_Sprites/Spinner_Sprites/spinner_run_attack_anim_all_dir_strip_8.png"),

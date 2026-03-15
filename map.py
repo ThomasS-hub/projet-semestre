@@ -1,3 +1,4 @@
+from arcade.key import O
 from dataclasses import dataclass
 from enum import Enum
 from typing import Final
@@ -9,6 +10,7 @@ class GridCell(Enum):
     CRYSTAL = 2
     SPINNER_HORIZONTAL = 3
     SPINNER_VERTICAL = 4
+    HOLE = 5
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,7 @@ def load_map_from_string(content: str) -> Map:
         "*": GridCell.CRYSTAL,
         "s": GridCell.SPINNER_HORIZONTAL,
         "S": GridCell.SPINNER_VERTICAL,
+        "O": GridCell.HOLE,
     }
 
     player_start_x = None
@@ -149,6 +152,9 @@ def _make_map_decouverte() -> Map:
 
     for (x, y) in [(20, 10), (25, 4)]:
         grid[height - 1 - y][x] = GridCell.SPINNER_VERTICAL
+
+    for (x,y) in [(8,8),(9,8),(15,5),(10,4),(13,2),(4,10)]:
+        grid[height - 1 - y][x] = GridCell.HOLE
 
     return Map(
         width=width,
