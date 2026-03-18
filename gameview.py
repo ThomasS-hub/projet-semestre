@@ -1,13 +1,13 @@
-from pyglet.resource import animation
-from arcade.key import F
 from typing import Final
 import arcade
 from textures import *
 from textures import SOUND_COIN
 from map import Map, GridCell
 from dataclasses import dataclass
+from enum import Enum
 from enum import IntEnum
 from constants import *
+import math
 
 LEFT_MARGIN = 200
 RIGHT_MARGIN = 200
@@ -24,11 +24,21 @@ class SpinnerInfo:
     min_pos: int
     max_pos: int
     speed: int
+
 class Direction(IntEnum):
     North = 0
     South = 1
     West = 2
     East = 3
+
+    def to_vector(self) -> tuple[int, int]: # permet d'extraire un vecteur déplacement d'une direction
+        if self == Direction.East:
+             return 1, 0
+        if self == Direction.West:
+            return -1, 0
+        if self == Direction.North:
+            return 0, 1
+        return 0, -1
 
 class Player(arcade.TextureAnimationSprite):
     direction: Direction
@@ -84,7 +94,84 @@ class Player(arcade.TextureAnimationSprite):
 
         super().update_animation(delta_time)
 
+class BoomerangState (Enum):
+    INACTIVE = 0 # represente les trois états possibles du boomerang sans string
+    LAUNCHING = 1
+    RETURNING = 2
 
+class Boomerang:
+    def __init__(self, start_x: float, start_y: float) -> None:
+
+        self.state = BoomerangState.INACTIVE #initialise les paramètres de boomerang
+        self.speed = 8
+        self.max_distance = 8 * TILE_SIZE
+        self.distance_travelled = 0.0
+
+        self.dx = 0.0
+        self.dy = 0.0
+
+        self.sprite = arcade.Sprite(scale=SCALE)
+        self.sprite.textures = BOOMERANG_TEXTURES
+        self.sprite.texture = BOOMERANG_TEXTURES[0]
+        self.sprite.cur_texture_index = 0
+        self.sprite.center_x = start_x
+        self.sprite.center_y = start_y
+
+    def is_active(self) -> bool:
+        return self.state != BoomerangState.INACTIVE
+
+    def launch(self, player_x: float, player_y: float, direction: Direction) -> None: # initialise chaque lancé
+        if self.is_active():
+            return
+
+        self.state = BoomerangState.LAUNCHING
+        self.distance_travelled = 0.0
+
+        self.sprite.center_x = player_x
+        self.sprite.center_y = player_y
+
+        self.dx, self.dy = direction.to_vector()
+
+    def update_launching(self) -> None:
+        self.sprite.center_x += self.dx * self.speed
+        self.sprite.center_y += self.dy * self.speed
+        self.distance_travelled += self.speed # car la vitesse pendant un frame est la distance parcouru pendant ce frame
+        self.sprite.cur_texture_index = (self.sprite.cur_texture_index + 1) % len(self.sprite.textures)
+        self.sprite.texture = self.sprite.textures[self.sprite.cur_texture_index]
+
+    def update_returning(self, player_x: float, player_y: float) -> None:
+        dx = player_x - self.sprite.center_x
+        dy = player_y - self.sprite.center_y
+        distance = math.sqrt(dx * dx + dy * dy) # norme de la distance entre le joueur et le boomerang
+
+        if distance == 0:
+            self.state = BoomerangState.INACTIVE
+            return
+
+        direction_x = dx / distance # nous donne la direction seulement en diviasant par la norme
+        direction_y = dy / distance
+
+        self.sprite.center_x += direction_x * self.speed # on multip:ie la direction par la vitesse
+        self.sprite.center_y += direction_y * self.speed
+        self.sprite.cur_texture_index = (self.sprite.cur_texture_index + 1) % len(self.sprite.textures)
+        self.sprite.texture = self.sprite.textures[self.sprite.cur_texture_index]
+
+    def is_close_to_player(self, player_x: float, player_y: float) -> bool:
+        dx = player_x - self.sprite.center_x
+        dy = player_y - self.sprite.center_y
+        distance = math.sqrt(dx * dx + dy * dy)
+        return distance <= self.speed
+
+    def reached_max_distance(self) -> bool:
+        return self.distance_travelled >= self.max_distance
+
+    def deactivate(self, player_x: float, player_y: float) -> None:
+        self.state = BoomerangState.INACTIVE
+        self.sprite.center_x = player_x
+        self.sprite.center_y = player_y
+
+    def switch_to_returning(self) -> None:
+        self.state = BoomerangState.RETURNING
 
 class GameView(arcade.View):
     """Main in-game view."""
@@ -133,6 +220,10 @@ class GameView(arcade.View):
             color=arcade.color.WHITE,
             font_size=20,
         )
+
+        self.boomerang = Boomerang(self.player.center_x, self.player.center_y)
+
+
         for x in range(self.map.width):
             for y in range(self.map.height):
                 cell = self.map.get_cell(x, y)
@@ -235,6 +326,36 @@ class GameView(arcade.View):
                 return True
         return False
 
+    def boomerang_hits_bush(self) -> bool:
+        grid_x = int(self.boomerang.sprite.center_x // TILE_SIZE)
+        grid_y = int(self.boomerang.sprite.center_y // TILE_SIZE)
+
+        if grid_x < 0 or grid_x >= self.map.width or grid_y < 0 or grid_y >= self.map.height:
+            return True
+
+        return self.map.get_cell(grid_x, grid_y) == GridCell.BUSH
+
+    def check_boomerang_hits_spinners(self) -> bool:
+        hit_something = False
+
+        for spinner in list(self.spinners):
+            dx = self.boomerang.sprite.center_x - spinner.center_x
+            dy = self.boomerang.sprite.center_y - spinner.center_y
+
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance <= TILE_SIZE / 2: # /2 car il faut s'assurer qu'il soit sur la même case
+                spinner.remove_from_sprite_lists() # supprime le spinner visuellement
+                for info in self.spinners_info: # enleve le spinner dans la logique du jeu
+                    if info.sprite == spinner:
+                        self.spinners_info.remove(info)
+                        break
+
+                hit_something = True
+
+        return hit_something
+
+
     def on_show_view(self) -> None:
         """Called automatically by 'window.show_view(game_view)' in main.py."""
         # When we show the view, adjust the window's size to our world size.
@@ -259,6 +380,8 @@ class GameView(arcade.View):
                 self.walls.draw()
                 self.crystals.draw()
                 self.spinners.draw()
+                if self.boomerang.is_active():
+                    arcade.draw_sprite(self.boomerang.sprite)
                 self.player_list.draw()
          with self.ui_camera.activate():
             self.score_text.y = self.window.height - 40
@@ -267,6 +390,9 @@ class GameView(arcade.View):
         if symbol == arcade.key.ESCAPE:
             self.window.show_view(GameView(self.map))
             return
+        if symbol == arcade.key.D:
+            self.boomerang.launch(self.player.center_x, self.player.center_y, self.player.direction)
+            return # empeche la touche D d'etre traiter pour autre chose
         self.player.on_key_press(symbol, modifiers)
     def on_key_release(self, symbol: int, modifiers: int) -> None:
         self.player.on_key_release(symbol, modifiers)
@@ -347,6 +473,23 @@ class GameView(arcade.View):
             return
 
         self.spinners.update_animation()
+        if self.boomerang.state == BoomerangState.LAUNCHING:
+            self.boomerang.update_launching()
+
+            if self.check_boomerang_hits_spinners():
+                self.boomerang.switch_to_returning()
+            elif self.boomerang_hits_bush():
+                self.boomerang.switch_to_returning()
+            elif self.boomerang.reached_max_distance():
+                self.boomerang.switch_to_returning()
+
+        elif self.boomerang.state == BoomerangState.RETURNING:
+            self.boomerang.update_returning(self.player.center_x, self.player.center_y)
+
+            self.check_boomerang_hits_spinners()
+
+            if self.boomerang.is_close_to_player(self.player.center_x, self.player.center_y):
+                self.boomerang.deactivate(self.player.center_x, self.player.center_y)
 
         if arcade.check_for_collision_with_list(self.player, self.spinners):
             self.window.show_view(GameView(self.map))

@@ -1,4 +1,3 @@
-from arcade.examples.particle_fireworks import TEXTURE
 from typing import Final
 from pathlib import Path
 import arcade
@@ -111,3 +110,11 @@ SPINNER_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
     frame_count=3
 )
 SPINNER_TEXTURES = [kf.texture for kf in SPINNER_ANIM.keyframes] #Extract the textures from the animation keyframes so they can be assigned to sprite.textures
+
+BOOMERANG_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
+    asset_path("assets/provided/boomerang-sheet.png"),
+    frame_count=8,
+    frame_duration=25,
+)
+
+BOOMERANG_TEXTURES = [kf.texture for kf in BOOMERANG_ANIM.keyframes]
