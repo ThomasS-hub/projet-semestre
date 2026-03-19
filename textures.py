@@ -119,39 +119,7 @@ BOOMERANG_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
 
 BOOMERANG_TEXTURES = [kf.texture for kf in BOOMERANG_ANIM.keyframes]
 
-EPEE_UP_ANIM = _load_animation_strip(
-    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_up_anim_strip_6.png"),
-    frame_count=6,
-    frame_duration=50,
-    tile_size=(48, 48),
+BAT_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Enemies_Sprites/Pinkbat_Sprites/pinkbat_idle_left_anim_strip_5.png"),
+    frame_count=5
 )
-
-EPEE_DOWN_ANIM = _load_animation_strip(
-    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_down_anim_strip_6.png"),
-    frame_count=6,
-    frame_duration=50,
-    tile_size=(48, 48),
-)
-
-EPEE_LEFT_ANIM = _load_animation_strip(
-    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_left_anim_strip_6.png"),
-    frame_count=6,
-    frame_duration=50,
-    tile_size=(48, 48),
-)
-
-EPEE_RIGHT_ANIM = _load_animation_strip(
-    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_right_anim_strip_6.png"),
-    frame_count=6,
-    frame_duration=50,
-    tile_size=(48, 48),
-)
-
-EPEE_UP_TEXTURES = [keyframe.texture for keyframe in EPEE_UP_ANIM.keyframes]
-EPEE_DOWN_TEXTURES = [keyframe.texture for keyframe in EPEE_DOWN_ANIM.keyframes]
-EPEE_LEFT_TEXTURES = [keyframe.texture for keyframe in EPEE_LEFT_ANIM.keyframes]
-EPEE_RIGHT_TEXTURES = [keyframe.texture for keyframe in EPEE_RIGHT_ANIM.keyframes]
-
-
-WEAPON_ICON_BOOMERANG = BOOMERANG_TEXTURES[0]
-WEAPON_ICON_EPEE = EPEE_DOWN_TEXTURES[1]
+BAT_TEXTURES = [kf.texture for kf in BAT_ANIM.keyframes]
