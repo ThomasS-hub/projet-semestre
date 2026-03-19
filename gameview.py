@@ -26,6 +26,7 @@ class SpinnerInfo:
     speed: int
 
 class Direction(IntEnum):
+    develloppe
     North = 0
     South = 1
     West = 2
