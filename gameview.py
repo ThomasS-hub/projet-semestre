@@ -1,3 +1,4 @@
+from tkinter import ACTIVE
 from typing import Final
 import arcade
 from textures import *
@@ -26,7 +27,6 @@ class SpinnerInfo:
     speed: int
 
 class Direction(IntEnum):
-    develloppe
     North = 0
     South = 1
     West = 2
@@ -96,9 +96,21 @@ class Player(arcade.TextureAnimationSprite):
         super().update_animation(delta_time)
 
 class BoomerangState (Enum):
+    UNDISPO = 3
     INACTIVE = 0 # represente les trois états possibles du boomerang sans string
     LAUNCHING = 1
     RETURNING = 2
+
+class EpéeState (Enum):
+    UNDISPO = 3
+    INACTIVE = 1
+    ACTIVE = 2
+
+class Epée:
+    def __init__(self, start_x: float, star_y: float) -> None:
+
+        self.state = EpéeState.INACTIVE # initialise la position du boomerang
+        self.speed
 
 class Boomerang:
     def __init__(self, start_x: float, start_y: float) -> None:
@@ -173,6 +185,7 @@ class Boomerang:
 
     def switch_to_returning(self) -> None:
         self.state = BoomerangState.RETURNING
+
 
 class GameView(arcade.View):
     """Main in-game view."""
