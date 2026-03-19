@@ -1,5 +1,6 @@
+from pytest import PytestReturnNotNoneWarning
 from tkinter import ACTIVE
-from typing import Final
+from typing import Final, Self
 import arcade
 from textures import *
 from textures import SOUND_COIN
@@ -95,61 +96,122 @@ class Player(arcade.TextureAnimationSprite):
 
         super().update_animation(delta_time)
 
-class BoomerangState (Enum):
-    UNDISPO = 3
-    INACTIVE = 0 # represente les trois états possibles du boomerang sans string
-    LAUNCHING = 1
-    RETURNING = 2
+class WeaponType(Enum):
+    BOOMERANG = 0
+    EPEE = 1
 
-class EpéeState (Enum):
-    UNDISPO = 3
-    INACTIVE = 1
-    ACTIVE = 2
+class WeaponState(Enum):
+    INACTIVE = 0
+    LAUNCHING = 1      # pour le boomerang
+    RETURNING = 2      # pour le boomerang
+    ACTIVE = 3         # pour l'épée
 
-class Epée:
-    def __init__(self, start_x: float, star_y: float) -> None:
-
-        self.state = EpéeState.INACTIVE # initialise la position du boomerang
-        self.speed
-
-class Boomerang:
+class Weapon:
     def __init__(self, start_x: float, start_y: float) -> None:
+        self.weapon_type = WeaponType.BOOMERANG
+        self.state = WeaponState.INACTIVE # initialise la position du boomerang
 
-        self.state = BoomerangState.INACTIVE #initialise les paramètres de boomerang
-        self.speed = 8
-        self.max_distance = 8 * TILE_SIZE
-        self.distance_travelled = 0.0
-
-        self.dx = 0.0
-        self.dy = 0.0
-
-        self.sprite = arcade.Sprite(scale=SCALE)
-        self.sprite.textures = BOOMERANG_TEXTURES
-        self.sprite.texture = BOOMERANG_TEXTURES[0]
-        self.sprite.cur_texture_index = 0
+        self.sprite = arcade.Sprite(scale=SCALE)#scale=SCALE afiche le sprtie en le multipliant par SCALE
         self.sprite.center_x = start_x
         self.sprite.center_y = start_y
 
-    def is_active(self) -> bool:
-        return self.state != BoomerangState.INACTIVE
+        self.dx = 0.0
+        self.dy =0.0
 
-    def launch(self, player_x: float, player_y: float, direction: Direction) -> None: # initialise chaque lancé
-        if self.is_active():
+        self.distance_travelled = 0.0
+        self.max_distance = 8 * TILE_SIZE
+        self.speed = 8
+
+        self.time = 0.0
+        self.attack_duration = 6 * 0.05
+
+        self.sprite.cur_texture_index = 0 # on actualise a la premiere image de la banque
+        self._set_boomerang_textures()
+
+
+    def set_weapon_type(self, weapon_type: WeaponType) -> None:
+        self.weapon_type = weapon_type
+        self.state = WeaponState.INACTIVE
+        self.sprite.cur_texture_index = 0
+
+        if weapon_type == WeaponType.BOOMERANG:
+            self._set_boomerang_textures()
+        else:
+            self._set_epee_textures(Direction.South)
+
+    def is_active(self) -> bool:
+        return self.state != WeaponState.INACTIVE
+
+    def change_weapon_type(self) -> None:
+        if self.is_active(): # ne fait rien si une arme est déjà active
+            return
+        # passer d'une arme a l'autre
+        if self.weapon_type == WeaponType.BOOMERANG:
+            self.set_weapon_type(WeaponType.EPEE)
+        else:
+            self.set_weapon_type(WeaponType.BOOMERANG)
+
+    def _set_boomerang_textures(self) -> None:
+        self.sprite.textures = BOOMERANG_TEXTURES # donne au sprite toutes les images du boomerang
+        self.sprite.texture = BOOMERANG_TEXTURES[0] # initialise a la première image
+        self.sprite.cur_texture_index = 0 # commence l'anim a la frame 0
+
+    def _set_epee_textures(self, direction: Direction) -> None: # calibre l'image de l'epee en fonction de la position du joueur
+        if direction == Direction.North: # adapte l'animation a la direction du joueur
+            textures = EPEE_UP_TEXTURES
+        elif direction == Direction.South:
+            textures = EPEE_DOWN_TEXTURES
+        elif direction == Direction.West:
+            textures = EPEE_LEFT_TEXTURES
+        else:
+            textures = EPEE_RIGHT_TEXTURES
+
+        self.sprite.textures = textures
+        self.sprite.texture = textures[0]
+        self.sprite.cur_texture_index = 0
+
+    def use(self, player_x: float, player_y: float, direction: Direction) -> None: # initialise chaque lancé
+        if self.is_active(): # empêche d'utliser deux fois une arme en même temps
             return
 
-        self.state = BoomerangState.LAUNCHING
+        if self.weapon_type == WeaponType.BOOMERANG:
+            self.use_boomerang(player_x, player_y, direction) # appelle méthode boomerang
+        else:
+            self.use_epee(player_x, player_y, direction) # appelle méthode epee
+
+    def use_epee(self, player_x: float, player_y: float, direction: Direction) -> None:
+        self.state = WeaponState.ACTIVE
+        self.time = 0.0
+        self.sprite.center_x = player_x
+        self.sprite.center_y = player_y
+        self._set_epee_textures(direction)
+
+    def update_epee(self, delta_time: float) -> None:
+        self.time += delta_time
+        index = int(self.time / 0.05) # temps écoulé / durée d'une frame = numéro de la frame (image a afficher)
+
+        if index >= len(self.sprite.textures): # si le index est superieur est nombre d'image alors l'image est terminé
+            self.state = WeaponState.INACTIVE
+            return
+        self.sprite.cur_texture_index = index
+        self.sprite.texture = self.sprite.textures[index]
+
+
+    def use_boomerang(self, player_x: float, player_y: float, direction: Direction) -> None:
+        self.state = WeaponState.LAUNCHING
         self.distance_travelled = 0.0
 
         self.sprite.center_x = player_x
         self.sprite.center_y = player_y
 
-        self.dx, self.dy = direction.to_vector()
+        self.dx, self.dy = direction.to_vector() # permet de cree le vectuer de deplacement reutiliser dans update_launching pour savoir dans quelle direction aller
+        self._set_boomerang_textures()
 
     def update_launching(self) -> None:
         self.sprite.center_x += self.dx * self.speed
         self.sprite.center_y += self.dy * self.speed
         self.distance_travelled += self.speed # car la vitesse pendant un frame est la distance parcouru pendant ce frame
-        self.sprite.cur_texture_index = (self.sprite.cur_texture_index + 1) % len(self.sprite.textures)
+        self.sprite.cur_texture_index = (self.sprite.cur_texture_index + 1) % len(self.sprite.textures) # permet de tourne en boucle sur les différentes animation
         self.sprite.texture = self.sprite.textures[self.sprite.cur_texture_index]
 
     def update_returning(self, player_x: float, player_y: float) -> None:
@@ -158,7 +220,7 @@ class Boomerang:
         distance = math.sqrt(dx * dx + dy * dy) # norme de la distance entre le joueur et le boomerang
 
         if distance == 0:
-            self.state = BoomerangState.INACTIVE
+            self.state = WeaponState.INACTIVE
             return
 
         direction_x = dx / distance # nous donne la direction seulement en diviasant par la norme
@@ -179,12 +241,12 @@ class Boomerang:
         return self.distance_travelled >= self.max_distance
 
     def deactivate(self, player_x: float, player_y: float) -> None:
-        self.state = BoomerangState.INACTIVE
+        self.state = WeaponState.INACTIVE
         self.sprite.center_x = player_x
         self.sprite.center_y = player_y
 
     def switch_to_returning(self) -> None:
-        self.state = BoomerangState.RETURNING
+        self.state = WeaponState.RETURNING
 
 
 class GameView(arcade.View):
@@ -235,7 +297,7 @@ class GameView(arcade.View):
             font_size=20,
         )
 
-        self.boomerang = Boomerang(self.player.center_x, self.player.center_y)
+        self.weapon = Weapon(self.player.center_x, self.player.center_y)
 
 
         for x in range(self.map.width):
@@ -341,8 +403,8 @@ class GameView(arcade.View):
         return False
 
     def boomerang_hits_bush(self) -> bool:
-        grid_x = int(self.boomerang.sprite.center_x // TILE_SIZE)
-        grid_y = int(self.boomerang.sprite.center_y // TILE_SIZE)
+        grid_x = int(self.weapon.sprite.center_x // TILE_SIZE)
+        grid_y = int(self.weapon.sprite.center_y // TILE_SIZE)
 
         if grid_x < 0 or grid_x >= self.map.width or grid_y < 0 or grid_y >= self.map.height:
             return True
@@ -353,8 +415,8 @@ class GameView(arcade.View):
         hit_something = False
 
         for spinner in list(self.spinners):
-            dx = self.boomerang.sprite.center_x - spinner.center_x
-            dy = self.boomerang.sprite.center_y - spinner.center_y
+            dx = self.weapon.sprite.center_x - spinner.center_x
+            dy = self.weapon.sprite.center_y - spinner.center_y
 
             distance = math.sqrt(dx * dx + dy * dy)
 
@@ -368,6 +430,22 @@ class GameView(arcade.View):
                 hit_something = True
 
         return hit_something
+
+    def check_epee_hits(self) -> None:
+    for spinner in list(self.spinners):
+        if arcade.check_for_collision(self.weapon.sprite, spinner): # fonction de Arcade qui mermet de tester les collisions
+            spinner.remove_from_sprite_lists()
+            for info in self.spinners_info: # retire visuellement et techniquement
+                if info.sprite == spinner:
+                    self.spinners_info.remove(info)
+                    break
+
+    for crystal in list(self.crystals):
+        if arcade.check_for_collision(self.weapon.sprite, crystal):
+            arcade.play_sound(SOUND_COIN)
+            crystal.remove_from_sprite_lists()
+            self.score += 1
+            self.score_text.text = f"Score: {self.score}"
 
 
     def on_show_view(self) -> None:
@@ -394,20 +472,27 @@ class GameView(arcade.View):
                 self.walls.draw()
                 self.crystals.draw()
                 self.spinners.draw()
-                if self.boomerang.is_active():
-                    arcade.draw_sprite(self.boomerang.sprite)
+                if self.weapon.is_active():
+                    arcade.draw_sprite(self.weapon.sprite)
                 self.player_list.draw()
          with self.ui_camera.activate():
             self.score_text.y = self.window.height - 40
             self.score_text.draw()
+
     def on_key_press(self, symbol: int, modifiers: int) -> None:
         if symbol == arcade.key.ESCAPE:
             self.window.show_view(GameView(self.map))
             return
+
+        if symbol == arcade.key.R:
+            self.weapon.change_weapon_type()
+            return
+
         if symbol == arcade.key.D:
-            self.boomerang.launch(self.player.center_x, self.player.center_y, self.player.direction)
+            self.weapon.use(self.player.center_x, self.player.center_y, self.player.direction)
             return # empeche la touche D d'etre traiter pour autre chose
         self.player.on_key_press(symbol, modifiers)
+
     def on_key_release(self, symbol: int, modifiers: int) -> None:
         self.player.on_key_release(symbol, modifiers)
 
@@ -487,24 +572,32 @@ class GameView(arcade.View):
             return
 
         self.spinners.update_animation()
-        if self.boomerang.state == BoomerangState.LAUNCHING:
-            self.boomerang.update_launching()
 
-            if self.check_boomerang_hits_spinners():
-                self.boomerang.switch_to_returning()
-            elif self.boomerang_hits_bush():
-                self.boomerang.switch_to_returning()
-            elif self.boomerang.reached_max_distance():
-                self.boomerang.switch_to_returning()
+        if self.weapon.weapon_type == WeaponType.BOOMERANG:
+            if self.weapon.state == WeaponState.LAUNCHING:
+                self.weapon.update_launching()
 
-        elif self.boomerang.state == BoomerangState.RETURNING:
-            self.boomerang.update_returning(self.player.center_x, self.player.center_y)
+                if self.check_boomerang_hits_spinners():
+                    self.weapon.switch_to_returning()
+                elif self.boomerang_hits_bush():
+                    self.weapon.switch_to_returning()
+                elif self.weapon.reached_max_distance():
+                    self.weapon.switch_to_returning()
 
-            self.check_boomerang_hits_spinners()
+            elif self.weapon.state == WeaponState.RETURNING:
+                self.weapon.update_returning(self.player.center_x, self.player.center_y)
 
-            if self.boomerang.is_close_to_player(self.player.center_x, self.player.center_y):
-                self.boomerang.deactivate(self.player.center_x, self.player.center_y)
+                self.check_boomerang_hits_spinners()
 
-        if arcade.check_for_collision_with_list(self.player, self.spinners):
+                if self.weapon.is_close_to_player(self.player.center_x, self.player.center_y):
+                    self.weapon.deactivate(self.player.center_x, self.player.center_y)
+        elif self.weapon.weapon_type == WeaponType.EPEE:
+            if self.weapon.state == WeaponState.ACTIVE:
+                self.weapon.update_epee(delta_time)
+                self.check_epee_hits()
+
+        collisions = arcade.check_for_collision_with_list(self.player, self.spinners)
+
+        if len(collisions) > 0:
             self.window.show_view(GameView(self.map))
             return

@@ -118,3 +118,31 @@ BOOMERANG_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(
 )
 
 BOOMERANG_TEXTURES = [kf.texture for kf in BOOMERANG_ANIM.keyframes]
+
+EPEE_UP_ANIM = _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_up_anim_strip_6.png"),
+    frame_count=6,
+    frame_duration=50,
+    tile_size=(48, 48),
+)
+
+EPEE_DOWN_ANIM = _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_down_anim_strip_6.png"),
+    frame_count=6,
+    frame_duration=50,
+    tile_size=(48, 48),
+)
+
+EPEE_LEFT_ANIM = _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_left_anim_strip_6.png"),
+    frame_count=6,
+    frame_duration=50,
+    tile_size=(48, 48),
+)
+
+EPEE_RIGHT_ANIM = _load_animation_strip(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Char_Sprites/char_attack48_right_anim_strip_6.png"),
+    frame_count=6,
+    frame_duration=50,
+    tile_size=(48, 48),
+)
