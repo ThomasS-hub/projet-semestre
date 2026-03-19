@@ -146,3 +146,12 @@ EPEE_RIGHT_ANIM = _load_animation_strip(
     frame_duration=50,
     tile_size=(48, 48),
 )
+
+EPEE_UP_TEXTURES = [keyframe.texture for keyframe in EPEE_UP_ANIM.keyframes]
+EPEE_DOWN_TEXTURES = [keyframe.texture for keyframe in EPEE_DOWN_ANIM.keyframes]
+EPEE_LEFT_TEXTURES = [keyframe.texture for keyframe in EPEE_LEFT_ANIM.keyframes]
+EPEE_RIGHT_TEXTURES = [keyframe.texture for keyframe in EPEE_RIGHT_ANIM.keyframes]
+
+
+WEAPON_ICON_BOOMERANG = BOOMERANG_TEXTURES[0]
+WEAPON_ICON_EPEE = EPEE_DOWN_TEXTURES[1]

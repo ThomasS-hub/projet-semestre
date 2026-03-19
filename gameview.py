@@ -1,6 +1,4 @@
-from pytest import PytestReturnNotNoneWarning
-from tkinter import ACTIVE
-from typing import Final, Self
+from typing import Final
 import arcade
 from textures import *
 from textures import SOUND_COIN
@@ -111,7 +109,7 @@ class Weapon:
         self.weapon_type = WeaponType.BOOMERANG
         self.state = WeaponState.INACTIVE # initialise la position du boomerang
 
-        self.sprite = arcade.Sprite(scale=SCALE)#scale=SCALE afiche le sprtie en le multipliant par SCALE
+        self.sprite = arcade.Sprite(scale=1)#scale=SCALE afiche le sprite en le multipliant par 1
         self.sprite.center_x = start_x
         self.sprite.center_y = start_y
 
@@ -126,18 +124,26 @@ class Weapon:
         self.attack_duration = 6 * 0.05
 
         self.sprite.cur_texture_index = 0 # on actualise a la premiere image de la banque
-        self._set_boomerang_textures()
+        self.set_scale()
+        self.set_boomerang_textures()
 
 
     def set_weapon_type(self, weapon_type: WeaponType) -> None:
         self.weapon_type = weapon_type
         self.state = WeaponState.INACTIVE
         self.sprite.cur_texture_index = 0
+        self.set_scale()
 
         if weapon_type == WeaponType.BOOMERANG:
-            self._set_boomerang_textures()
+            self.set_boomerang_textures()
         else:
-            self._set_epee_textures(Direction.South)
+            self.set_epee_textures(Direction.South)
+
+    def set_scale(self) -> None:
+        if self.weapon_type == WeaponType.BOOMERANG:
+            self.sprite.scale = SCALE
+        else:  # EPEE
+            self.sprite.scale = 1.3
 
     def is_active(self) -> bool:
         return self.state != WeaponState.INACTIVE
@@ -151,12 +157,12 @@ class Weapon:
         else:
             self.set_weapon_type(WeaponType.BOOMERANG)
 
-    def _set_boomerang_textures(self) -> None:
+    def set_boomerang_textures(self) -> None:
         self.sprite.textures = BOOMERANG_TEXTURES # donne au sprite toutes les images du boomerang
         self.sprite.texture = BOOMERANG_TEXTURES[0] # initialise a la première image
         self.sprite.cur_texture_index = 0 # commence l'anim a la frame 0
 
-    def _set_epee_textures(self, direction: Direction) -> None: # calibre l'image de l'epee en fonction de la position du joueur
+    def set_epee_textures(self, direction: Direction) -> None: # calibre l'image de l'epee en fonction de la position du joueur
         if direction == Direction.North: # adapte l'animation a la direction du joueur
             textures = EPEE_UP_TEXTURES
         elif direction == Direction.South:
@@ -182,9 +188,22 @@ class Weapon:
     def use_epee(self, player_x: float, player_y: float, direction: Direction) -> None:
         self.state = WeaponState.ACTIVE
         self.time = 0.0
-        self.sprite.center_x = player_x
-        self.sprite.center_y = player_y
-        self._set_epee_textures(direction)
+
+        offset = int(1.25 * TILE_SIZE) # décalage de l'épée vers l'avant du joeur
+        if direction == Direction.North:
+            self.sprite.center_x = player_x
+            self.sprite.center_y = player_y + offset
+        elif direction == Direction.South:
+            self.sprite.center_x = player_x
+            self.sprite.center_y = player_y - offset
+        elif direction == Direction.West:
+            self.sprite.center_x = player_x - offset
+            self.sprite.center_y = player_y
+        else:
+            self.sprite.center_x = player_x + offset
+            self.sprite.center_y = player_y
+
+        self.set_epee_textures(direction)
 
     def update_epee(self, delta_time: float) -> None:
         self.time += delta_time
@@ -205,7 +224,7 @@ class Weapon:
         self.sprite.center_y = player_y
 
         self.dx, self.dy = direction.to_vector() # permet de cree le vectuer de deplacement reutiliser dans update_launching pour savoir dans quelle direction aller
-        self._set_boomerang_textures()
+        self.set_boomerang_textures()
 
     def update_launching(self) -> None:
         self.sprite.center_x += self.dx * self.speed
@@ -296,6 +315,10 @@ class GameView(arcade.View):
             color=arcade.color.WHITE,
             font_size=20,
         )
+
+        self.weapon_icon = arcade.Sprite(scale=2) #creer un sprite pour afficher l'arme
+        self.weapon_icon.center_x = 50
+        self.weapon_icon.center_y = 50
 
         self.weapon = Weapon(self.player.center_x, self.player.center_y)
 
@@ -432,21 +455,25 @@ class GameView(arcade.View):
         return hit_something
 
     def check_epee_hits(self) -> None:
-    for spinner in list(self.spinners):
-        if arcade.check_for_collision(self.weapon.sprite, spinner): # fonction de Arcade qui mermet de tester les collisions
-            spinner.remove_from_sprite_lists()
-            for info in self.spinners_info: # retire visuellement et techniquement
-                if info.sprite == spinner:
-                    self.spinners_info.remove(info)
-                    break
+        for spinner in list(self.spinners):
+            if arcade.check_for_collision(self.weapon.sprite, spinner): # fonction de Arcade qui mermet de tester les collisions
+                spinner.remove_from_sprite_lists()
+                for info in self.spinners_info: # retire visuellement et techniquement
+                    if info.sprite == spinner:
+                        self.spinners_info.remove(info)
+                        break
+        for crystal in list(self.crystals):
+            if arcade.check_for_collision(self.weapon.sprite, crystal):
+                arcade.play_sound(SOUND_COIN)
+                crystal.remove_from_sprite_lists()
+                self.score += 1
+                self.score_text.text = f"Score: {self.score}"
 
-    for crystal in list(self.crystals):
-        if arcade.check_for_collision(self.weapon.sprite, crystal):
-            arcade.play_sound(SOUND_COIN)
-            crystal.remove_from_sprite_lists()
-            self.score += 1
-            self.score_text.text = f"Score: {self.score}"
-
+    def update_weapon_icon(self) -> None: # determine quel arme affiché
+        if self.weapon.weapon_type == WeaponType.BOOMERANG:
+            self.weapon_icon.texture = WEAPON_ICON_BOOMERANG
+        else:
+            self.weapon_icon.texture = WEAPON_ICON_EPEE
 
     def on_show_view(self) -> None:
         """Called automatically by 'window.show_view(game_view)' in main.py."""
@@ -474,14 +501,22 @@ class GameView(arcade.View):
                 self.spinners.draw()
                 if self.weapon.is_active():
                     arcade.draw_sprite(self.weapon.sprite)
-                self.player_list.draw()
+                if not (self.weapon.weapon_type == WeaponType.EPEE and self.weapon.state == WeaponState.ACTIVE): # permet l'affichage du joeur ssi l'épée est inacivité
+                    self.player_list.draw()
          with self.ui_camera.activate():
             self.score_text.y = self.window.height - 40
             self.score_text.draw()
+            self.update_weapon_icon()
+            self.weapon_icon.center_x = 60
+            self.weapon_icon.center_y = self.window.height - 60
+            arcade.draw_sprite(self.weapon_icon)
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
         if symbol == arcade.key.ESCAPE:
             self.window.show_view(GameView(self.map))
+            return
+
+        if self.weapon.weapon_type == WeaponType.EPEE and self.weapon.state == WeaponState.ACTIVE:
             return
 
         if symbol == arcade.key.R:
@@ -491,9 +526,12 @@ class GameView(arcade.View):
         if symbol == arcade.key.D:
             self.weapon.use(self.player.center_x, self.player.center_y, self.player.direction)
             return # empeche la touche D d'etre traiter pour autre chose
+
         self.player.on_key_press(symbol, modifiers)
 
     def on_key_release(self, symbol: int, modifiers: int) -> None:
+        if self.weapon.weapon_type == WeaponType.EPEE and self.weapon.state == WeaponState.ACTIVE:
+            return
         self.player.on_key_release(symbol, modifiers)
 
     def _update_camera(self) -> None:
