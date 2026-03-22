@@ -1,7 +1,9 @@
 import arcade
 
-from gameview import GameView, grid_to_pixels, Direction
-from map import load_map_from_string, GridCell
+from gameview import GameView, grid_to_pixels
+from player import Direction
+from map import load_map_from_string
+from spinner import spinner_horizontal_limits, spinner_vertical_limits
 
 
 def make_view_from_string(content: str) -> GameView:
@@ -110,8 +112,7 @@ xxxxxxx
     view = make_view_from_string(content)
     window.show_view(view)
 
-    initial_crystals = len(view.crystals)
-    assert initial_crystals == 1
+    assert len(view.crystals) == 1
     assert view.score == 0
 
     view.on_key_press(arcade.key.RIGHT, 0)
@@ -161,7 +162,7 @@ xxxxxxxxx
     view = make_view_from_string(content)
     window.show_view(view)
 
-    left, right = view._spinner_horizontal_limits(2, 2)
+    left, right = spinner_horizontal_limits(view.map, 2, 2)
     assert left == 1
     assert right == 5
 
@@ -182,7 +183,7 @@ xxxxxxx
     view = make_view_from_string(content)
     window.show_view(view)
 
-    down, up = view._spinner_vertical_limits(3, 4)
+    down, up = spinner_vertical_limits(view.map, 3, 4)
     assert down == 2
     assert up == 4
 
@@ -234,4 +235,5 @@ xxxxxx
     assert view.player.direction == Direction.South
 
     view.on_key_press(arcade.key.RIGHT, 0)
+    assert view.player.direction == Direction.East
     assert view.player.direction == Direction.East

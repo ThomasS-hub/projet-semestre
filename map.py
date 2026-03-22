@@ -1,4 +1,3 @@
-from arcade.key import O
 from dataclasses import dataclass
 from enum import Enum
 from typing import Final
@@ -97,7 +96,7 @@ def load_map_from_string(content: str) -> Map:
         "s": GridCell.SPINNER_HORIZONTAL,
         "S": GridCell.SPINNER_VERTICAL,
         "O": GridCell.HOLE,
-        "V": GridCell.BAT,
+        "v": GridCell.BAT,
     }
 
     player_start_x = None
@@ -128,11 +127,14 @@ def load_map_from_string(content: str) -> Map:
     if player_count != 1:
         raise InvalidMapFileException("il faut exactement un P")
 
+    assert player_start_x is not None
+    assert player_start_y is not None
+
     return Map(
         width=width,
         height=height,
-        player_start_x=player_start_x,
-        player_start_y=player_start_y,
+        player_start_x = player_start_x,
+        player_start_y = player_start_y,
         grid=tuple(grid_rows),
     )
 
