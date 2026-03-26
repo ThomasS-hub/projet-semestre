@@ -1,4 +1,7 @@
-def update_camera(camera, player, window, world_width: int, world_height: int) -> None:
+import arcade
+from player import Player
+
+def update_camera(camera: arcade.camera.Camera2D, player: Player, window: arcade.Window, world_width: int, world_height: int) -> None:
     LEFT_MARGIN = 200
     RIGHT_MARGIN = 200
     BOTTOM_MARGIN = 200

@@ -3,7 +3,7 @@ import pytest
 from map import GridCell, InvalidMapFileException, load_map_from_string
 
 
-def test_load_valid_map():
+def test_load_valid_map() -> None:
     content = """width: 4
 height: 3
 ---
@@ -20,7 +20,7 @@ x
     assert m.player_start_y == 2
 
 
-def test_missing_player():
+def test_missing_player() -> None:
     content = """width: 3
 height: 2
 ---
@@ -32,7 +32,7 @@ xxx
         load_map_from_string(content)
 
 
-def test_two_players():
+def test_two_players() -> None:
     content = """width: 3
 height: 2
 ---
@@ -44,7 +44,7 @@ xxx
         load_map_from_string(content)
 
 
-def test_invalid_character():
+def test_invalid_character() -> None:
     content = """width: 3
 height: 1
 ---
@@ -55,7 +55,7 @@ aP
         load_map_from_string(content)
 
 
-def test_line_too_long():
+def test_line_too_long() -> None:
     content = """width: 3
 height: 1
 ---
@@ -66,7 +66,7 @@ xxxx
         load_map_from_string(content)
 
 
-def test_get_cell_coordinates():
+def test_get_cell_coordinates() -> None:
     content = """width: 2
 height: 2
 ---
