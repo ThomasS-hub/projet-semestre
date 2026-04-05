@@ -159,3 +159,8 @@ EPEE_RIGHT_TEXTURES = [keyframe.texture for keyframe in EPEE_RIGHT_ANIM.keyframe
 
 WEAPON_ICON_BOOMERANG = BOOMERANG_TEXTURES[0]
 WEAPON_ICON_EPEE = EPEE_DOWN_TEXTURES[1]
+
+SLIME_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Enemies_Sprites/Pinkslime_Sprites/pinkslime_idle_anim_all_dir_strip_6.png"),
+    frame_count=6,
+)
+SLIME_TEXTURES = [kf.texture for kf in SLIME_ANIM.keyframes]

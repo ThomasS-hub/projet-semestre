@@ -14,11 +14,11 @@ from textures import (
 
 from player import Direction
 
-class WeaponType(Enum):
+class WeaponType(Enum): # changer le enum car ce n'est pas un enum ici
     BOOMERANG = 0
     EPEE = 1
 
-class WeaponState(Enum):
+class WeaponState(Enum): # meme chose que pour le type d'arme, ce n'est pas un enum
     INACTIVE = 0
     LAUNCHING = 1      # pour le boomerang
     RETURNING = 2      # pour le boomerang

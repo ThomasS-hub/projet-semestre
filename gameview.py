@@ -19,6 +19,7 @@ from textures import (
     WEAPON_ICON_EPEE,
     SOUND_COIN,
     BAT_TEXTURES,
+    SLIME_TEXTURES,
 )
 from map import Map, GridCell
 from player import Player
@@ -26,6 +27,7 @@ from weapon import Weapon, WeaponType, WeaponState
 from spinner import SpinnerInfo, spinner_horizontal_limits, spinner_vertical_limits, update_spinners
 from camera import update_camera
 from bats import BatInfo, update_bats
+from slimes import SlimeInfo, slime_possible_destinations, choose_new_destination, update_slimes
 
 LEFT_MARGIN = 200
 RIGHT_MARGIN = 200
@@ -52,6 +54,8 @@ class GameView(arcade.View):
     holes: Final[arcade.SpriteList]
     bats: Final[arcade.SpriteList]
     bats_info: list[BatInfo]
+    slimes: Final[arcade.SpriteList]
+    slimes_info: list[SlimeInfo]
     rng: random.Random
     ui_camera: Final[arcade.camera.Camera2D]
     score: int
@@ -79,6 +83,8 @@ class GameView(arcade.View):
         self.holes = arcade.SpriteList(use_spatial_hash=True)
         self.bats = arcade.SpriteList()
         self.bats_info = []
+        self.slimes = arcade.SpriteList()
+        self.slimes_info = []
         self.rng = random.Random()
         self.ui_camera = arcade.camera.Camera2D()
         self.score = 0
@@ -186,7 +192,26 @@ class GameView(arcade.View):
                             vy=0.0,
                         )
                     )
-
+                elif cell == GridCell.SLIME:
+                    slime = arcade.Sprite(scale=SCALE)
+                    slime.textures = SLIME_TEXTURES
+                    slime.texture = SLIME_TEXTURES[0]
+                    slime.cur_texture_index = 0
+                    slime.center_x = grid_to_pixels(x)
+                    slime.center_y = grid_to_pixels(y)
+                    self.slimes.append(slime)
+                    possible_destinations = slime_possible_destinations(self.map, x, y, TILE_SIZE)
+                    slime_info = SlimeInfo(
+                        sprite=slime,
+                        start_x=x,
+                        start_y=y,
+                        possible_destinations=possible_destinations,
+                        current_path=[],
+                        path_index=0,
+                        speed=1.0,
+                    )
+                    choose_new_destination(slime_info, self.rng, self.map)
+                    self.slimes_info.append(slime_info)
 
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, self.walls)
         self.camera = arcade.camera.Camera2D()
@@ -226,9 +251,9 @@ class GameView(arcade.View):
 
             if distance <= TILE_SIZE / 2: # /2 car il faut s'assurer qu'il soit sur la même case
                 spinner.remove_from_sprite_lists() # supprime le spinner visuellement
-                for info in self.spinners_info: # enleve le spinner dans la logique du jeu
-                    if info.sprite == spinner:
-                        self.spinners_info.remove(info)
+                for spinner_info in self.spinners_info: # enleve le spinner dans la logique du jeu
+                    if spinner_info.sprite == spinner:
+                        self.spinners_info.remove(spinner_info)
                         break
 
                 hit_something = True
@@ -240,9 +265,23 @@ class GameView(arcade.View):
 
             if distance <= TILE_SIZE / 2:
                 bat.remove_from_sprite_lists()
-                for info in self.bats_info:
-                    if info.sprite == bat:
-                        self.bats_info.remove(info)
+                for bat_info in self.bats_info:
+                    if bat_info.sprite == bat:
+                        self.bats_info.remove(bat_info)
+                        break
+
+                hit_something = True
+        for slime in list(self.slimes):
+            dx = self.weapon.sprite.center_x - slime.center_x
+            dy = self.weapon.sprite.center_y - slime.center_y
+
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance <= TILE_SIZE / 2:
+                slime.remove_from_sprite_lists()
+                for slime_info in self.slimes_info:
+                    if slime_info.sprite == slime:
+                        self.slimes_info.remove(slime_info)
                         break
 
                 hit_something = True
@@ -253,9 +292,9 @@ class GameView(arcade.View):
         for spinner in list(self.spinners):
             if arcade.check_for_collision(self.weapon.sprite, spinner): # fonction de Arcade qui mermet de tester les collisions
                 spinner.remove_from_sprite_lists()
-                for info in self.spinners_info: # retire visuellement et techniquement
-                    if info.sprite == spinner:
-                        self.spinners_info.remove(info)
+                for spinner_info in self.spinners_info: # retire visuellement et techniquement
+                    if spinner_info.sprite == spinner:
+                        self.spinners_info.remove(spinner_info)
                         break
         for crystal in list(self.crystals):
             if arcade.check_for_collision(self.weapon.sprite, crystal):
@@ -266,9 +305,16 @@ class GameView(arcade.View):
         for bat in list(self.bats):
             if arcade.check_for_collision(self.weapon.sprite, bat):
                 bat.remove_from_sprite_lists()
-                for info in self.bats_info:
-                    if info.sprite == bat:
-                        self.bats_info.remove(info)
+                for bat_info in self.bats_info:
+                    if bat_info.sprite == bat:
+                        self.bats_info.remove(bat_info)
+                        break
+        for slime in list(self.slimes):
+            if arcade.check_for_collision(self.weapon.sprite, slime):
+                slime.remove_from_sprite_lists()
+                for slime_info in self.slimes_info:
+                    if slime_info.sprite == slime:
+                        self.slimes_info.remove(slime_info)
                         break
 
 
@@ -303,6 +349,7 @@ class GameView(arcade.View):
                 self.crystals.draw()
                 self.spinners.draw()
                 self.bats.draw()
+                self.slimes.draw()
                 if self.weapon.is_active():
                     arcade.draw_sprite(self.weapon.sprite)
                 if not (self.weapon.weapon_type == WeaponType.EPEE and self.weapon.state == WeaponState.ACTIVE): # permet l'affichage du joeur ssi l'épée est inacivité
@@ -366,6 +413,11 @@ class GameView(arcade.View):
              bat.cur_texture_index = (bat.cur_texture_index + 1) % len(bat.textures) # change la frame de l'animation pour faire bouger les ailes des chauves-souris
              bat.texture = bat.textures[bat.cur_texture_index]
 
+        update_slimes(self.slimes_info, self.rng, self.map, TILE_SIZE)
+        for slime in self.slimes:
+             slime.cur_texture_index = (slime.cur_texture_index + 1) % len(slime.textures) # change la frame de l'animation pour faire bouger les slimes
+             slime.texture = slime.textures[slime.cur_texture_index]
+
         if self.weapon.weapon_type == WeaponType.BOOMERANG:
             if self.weapon.state == WeaponState.LAUNCHING:
                 self.weapon.update_launching()
@@ -395,6 +447,7 @@ class GameView(arcade.View):
             self.window.show_view(GameView(self.map))
             return
 
-        if arcade.check_for_collision_with_list(self.player, self.bats):
-            self.window.show_view(GameView(self.map))
-            return
+        for monsters in (self.spinners, self.bats, self.slimes):
+            if arcade.check_for_collision_with_list(self.player, monsters):
+                self.window.show_view(GameView(self.map))
+                return

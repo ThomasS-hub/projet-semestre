@@ -2,7 +2,7 @@ width: 40
 height: 15
 ---
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-x  *     O         S     x       v     x
+x  *     O         S     x    m   v    x
 x             v          x    *   *    x
 x   v                   * x            x
 x         s        xxxxxxx      O     sx
@@ -10,9 +10,9 @@ x     xxx *   xx                       x
 x                            xxx       x
 x    v        xxxxxxxxxx        x      x
 x         *                    x   *   x
-x      S              S     *  x       x
+x      S    m          S     *  x      x
 x  *            *                      x
-x        O           v          O      x
+x        O           v     m     O     x
 x     xx     s        xs            v  x
 x  P      *           x       *        x
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

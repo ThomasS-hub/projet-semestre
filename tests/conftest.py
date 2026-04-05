@@ -35,7 +35,7 @@ def prepare_window(window: arcade.Window, caption: str) -> None:
     arcade.SpriteList.DEFAULT_TEXTURE_FILTER = gl.LINEAR, gl.LINEAR
     window._start_finish_render_data = None
     window.hide_view()  # Disable views if any is active
-    window.dispatch_pending_events()
+    window.dispatch_events()
     try:
         arcade.disable_timings()
     except Exception:

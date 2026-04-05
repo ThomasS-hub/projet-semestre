@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Final
+import math
+import networkx as nx
+from constants import TILE_SIZE
 
 
-class GridCell(Enum):
+class GridCell(Enum): # meme chose changer le enum car ce n'est pas un enum ici
     GRASS = 0
     BUSH = 1
     CRYSTAL = 2
@@ -11,6 +14,7 @@ class GridCell(Enum):
     SPINNER_VERTICAL = 4
     HOLE = 5
     BAT = 6
+    SLIME = 7
 
 
 @dataclass(frozen=True)
@@ -20,6 +24,7 @@ class Map:
     player_start_x: int
     player_start_y: int
     grid: tuple[tuple[GridCell, ...], ...]
+    navmesh: nx.Graph[tuple[int, int]]
 
     def get_cell(self, x: int, y: int) -> GridCell:
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -29,6 +34,49 @@ class Map:
 
 class InvalidMapFileException(Exception):
     pass
+
+
+def build_navmesh(width: int, height: int, grid: tuple[tuple[GridCell, ...], ...]) -> nx.Graph[tuple[int, int]]: # construit un graphe de navigation à partir de la grille de la map, en connectant les cases adjacentes qui ne sont pas des buissons ou des trous, et en attribuant un poids égal à la distance entre les centres des cases (TILE_SIZE pour les cases orthogonales, sqrt(2)*TILE_SIZE pour les cases diagonales)
+    graph: nx.Graph[tuple[int, int]] = nx.Graph()
+
+    def get_cell(x: int, y: int) -> GridCell:
+        return grid[height - 1 - y][x]
+
+    for x in range(width):
+        for y in range(height):
+            cell = get_cell(x, y)
+            if cell in {GridCell.BUSH, GridCell.HOLE}:
+                continue
+
+            graph.add_node((x, y))
+
+    directions = [
+        (1, 0), (-1, 0), (0, 1), (0, -1),
+        (1, 1), (1, -1), (-1, 1), (-1, -1),
+    ] # directions de déplacement possibles (orthogonales et diagonales)
+
+    for x in range(width):
+        for y in range(height):
+            if (x, y) not in graph:
+                continue
+
+            for dx, dy in directions:
+                nx_, ny_ = x + dx, y + dy
+
+                if nx_ < 0 or nx_ >= width or ny_ < 0 or ny_ >= height:
+                    continue
+
+                if (nx_, ny_) not in graph: # on relie seulement les cases qui sont dans le graphe, c'est à dire qui ne sont pas des buissons ou des trous
+                    continue
+
+                if dx == 0 or dy == 0:
+                    weight = TILE_SIZE
+                else:
+                    weight = math.sqrt(2) * TILE_SIZE # distance entre les centres de deux cases diagonales
+
+                graph.add_edge((x, y), (nx_, ny_), weight=weight) # on ajoute une arête entre les deux cases avec le poids correspondant à la distance entre leurs centres
+
+    return graph
 
 
 def load_map_from_file(filename: str) -> Map:
@@ -97,6 +145,7 @@ def load_map_from_string(content: str) -> Map:
         "S": GridCell.SPINNER_VERTICAL,
         "O": GridCell.HOLE,
         "v": GridCell.BAT,
+        "m": GridCell.SLIME,
     }
 
     player_start_x = None
@@ -136,6 +185,7 @@ def load_map_from_string(content: str) -> Map:
         player_start_x = player_start_x,
         player_start_y = player_start_y,
         grid=tuple(grid_rows),
+        navmesh=build_navmesh(width, height, tuple(grid_rows)),
     )
 
 
@@ -160,12 +210,15 @@ def _make_map_decouverte() -> Map:
     for (x,y) in [(8,8),(9,8),(15,5),(10,4),(13,2),(4,10)]:
         grid[height - 1 - y][x] = GridCell.HOLE
 
+    grid_tuples = tuple(tuple(row) for row in grid)
+
     return Map(
         width=width,
         height=height,
         player_start_x=2,
         player_start_y=2,
-        grid=tuple(tuple(row) for row in grid),
+        grid=grid_tuples,
+        navmesh=build_navmesh(width, height, grid_tuples),
     )
 
 

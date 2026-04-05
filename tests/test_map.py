@@ -5,20 +5,24 @@ from map import (
     Map,
     InvalidMapFileException,
     load_map_from_string,
+    build_navmesh,
 )
 
 
 def test_get_cell_basic() -> None:
-    game_map = Map(
-        width=3,
-        height=2,
-        player_start_x=0,
-        player_start_y=0,
-        grid=(
-            (GridCell.BUSH, GridCell.CRYSTAL, GridCell.GRASS),
-            (GridCell.HOLE, GridCell.SPINNER_HORIZONTAL, GridCell.SPINNER_VERTICAL),
-        ),
+    grid = (
+    (GridCell.BUSH, GridCell.CRYSTAL, GridCell.GRASS),
+    (GridCell.HOLE, GridCell.SPINNER_HORIZONTAL, GridCell.SPINNER_VERTICAL),
     )
+    game_map = Map(
+    width=3,
+    height=2,
+    player_start_x=0,
+    player_start_y=0,
+    grid=grid,
+    navmesh=build_navmesh(3, 2, grid),
+    )
+
 
     assert game_map.get_cell(0, 0) == GridCell.HOLE
     assert game_map.get_cell(1, 0) == GridCell.SPINNER_HORIZONTAL
@@ -29,15 +33,17 @@ def test_get_cell_basic() -> None:
 
 
 def test_get_cell_out_of_bounds() -> None:
+    grid=(
+            (GridCell.GRASS, GridCell.GRASS),
+            (GridCell.GRASS, GridCell.GRASS),
+        )
     game_map = Map(
         width=2,
         height=2,
         player_start_x=0,
         player_start_y=0,
-        grid=(
-            (GridCell.GRASS, GridCell.GRASS),
-            (GridCell.GRASS, GridCell.GRASS),
-        ),
+        grid=grid,
+        navmesh=build_navmesh(2, 2, grid),
     )
 
     with pytest.raises(IndexError):
@@ -217,3 +223,20 @@ xxxxx
     assert game_map.get_cell(2, 1) == GridCell.GRASS
     assert game_map.get_cell(3, 1) == GridCell.GRASS
     assert game_map.get_cell(4, 1) == GridCell.GRASS
+
+def test_build_navmesh_excludes_bush_and_hole() -> None:
+    width = 3
+    height = 3
+    grid = [
+        [GridCell.GRASS, GridCell.GRASS, GridCell.GRASS],
+        [GridCell.GRASS, GridCell.BUSH, GridCell.GRASS],
+        [GridCell.GRASS, GridCell.HOLE, GridCell.GRASS],
+    ]
+    grid_tuple = tuple(tuple(row) for row in grid)
+
+    navmesh = build_navmesh(width, height, grid_tuple)
+
+    assert (1, 1) not in navmesh
+    assert (1, 0) not in navmesh
+    assert (0, 0) in navmesh
+    assert (2, 2) in navmesh
