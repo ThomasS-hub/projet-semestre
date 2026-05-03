@@ -236,7 +236,7 @@ def test_build_navmesh_excludes_bush_and_hole() -> None:
 
     navmesh = build_navmesh(width, height, grid_tuple)
 
-    assert (1, 1) not in navmesh
-    assert (1, 0) not in navmesh
-    assert (0, 0) in navmesh
-    assert (2, 2) in navmesh
+    assert all(node[0:2] != (1, 1) for node in navmesh)
+    assert all(node[0:2] != (1, 0) for node in navmesh)
+    assert any(node[0:2] == (0, 0) for node in navmesh)
+    assert any(node[0:2] == (2, 2) for node in navmesh)

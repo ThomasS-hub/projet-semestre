@@ -21,10 +21,13 @@ def main() -> None:
         print(f"Erreur dans le fichier de map : {e}")
         return
 
+
     window = arcade.Window(MAX_WINDOW_WIDTH, MAX_WINDOW_HEIGHT, WINDOW_TITLE)
     game_view = GameView(game_map)
     window.show_view(game_view)
     arcade.run()
+    game_view.profiler.dump_stats("profile_stats.me")
+
 
 
 if __name__ == "__main__":

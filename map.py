@@ -5,6 +5,8 @@ import math
 import networkx as nx
 from constants import TILE_SIZE
 
+type NavNode = tuple[int, int, int, int] # type pour représenter une position de grille dans le graphe de navigation
+
 
 class GridCell(Enum): # meme chose changer le enum car ce n'est pas un enum ici
     GRASS = 0
@@ -24,7 +26,7 @@ class Map:
     player_start_x: int
     player_start_y: int
     grid: tuple[tuple[GridCell, ...], ...]
-    navmesh: nx.Graph[tuple[int, int]]
+    navmesh: nx.Graph[NavNode]
 
     def get_cell(self, x: int, y: int) -> GridCell:
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -36,45 +38,77 @@ class InvalidMapFileException(Exception):
     pass
 
 
-def build_navmesh(width: int, height: int, grid: tuple[tuple[GridCell, ...], ...]) -> nx.Graph[tuple[int, int]]: # construit un graphe de navigation à partir de la grille de la map, en connectant les cases adjacentes qui ne sont pas des buissons ou des trous, et en attribuant un poids égal à la distance entre les centres des cases (TILE_SIZE pour les cases orthogonales, sqrt(2)*TILE_SIZE pour les cases diagonales)
-    graph: nx.Graph[tuple[int, int]] = nx.Graph()
+def build_navmesh(width: int,height: int,grid: tuple[tuple[GridCell, ...], ...],density: int = 3,) -> nx.Graph[NavNode]:
+    graph: nx.Graph[NavNode] = nx.Graph()
 
     def get_cell(x: int, y: int) -> GridCell:
         return grid[height - 1 - y][x]
 
+    def node_position(x: int, y: int, sx: int, sy: int) -> tuple[float, float]:
+        px = x * TILE_SIZE + ((2 * sx + 1) * TILE_SIZE) / (2 * density)
+        py = y * TILE_SIZE + ((2 * sy + 1) * TILE_SIZE) / (2 * density)
+        return px, py
+
+    def too_close_to_bush(px: float, py: float) -> bool:
+        for bx in range(width):
+            for by in range(height):
+                if get_cell(bx, by) != GridCell.BUSH:
+                    continue
+
+                bush_x = bx * TILE_SIZE + TILE_SIZE / 2
+                bush_y = by * TILE_SIZE + TILE_SIZE / 2
+
+                dx = px - bush_x
+                dy = py - bush_y
+
+                if math.sqrt(dx * dx + dy * dy) < TILE_SIZE:
+                    return True
+
+        return False
+
+    nodes_by_position: dict[tuple[int, int], NavNode] = {} # dictionnaire pour retrouver le noeud du graphe à partir d'une position globale (en comptant les subdivisions)
+
     for x in range(width):
         for y in range(height):
-            cell = get_cell(x, y)
-            if cell in {GridCell.BUSH, GridCell.HOLE}:
+            if get_cell(x, y) in {GridCell.BUSH, GridCell.HOLE}:
                 continue
 
-            graph.add_node((x, y))
+            for sx in range(density):
+                for sy in range(density):
+                    px, py = node_position(x, y, sx, sy)
+
+                    if too_close_to_bush(px, py):
+                        continue
+
+                    node = (x, y, sx, sy)
+                    graph.add_node(node)
+
+                    global_x = x * density + sx
+                    global_y = y * density + sy
+                    nodes_by_position[(global_x, global_y)] = node
 
     directions = [
         (1, 0), (-1, 0), (0, 1), (0, -1),
         (1, 1), (1, -1), (-1, 1), (-1, -1),
-    ] # directions de déplacement possibles (orthogonales et diagonales)
+    ]
 
-    for x in range(width):
-        for y in range(height):
-            if (x, y) not in graph:
+    step = TILE_SIZE / density
+
+    for (global_x, global_y), node in nodes_by_position.items(): # pour chaque noeud du graphe, on regarde les 8 positions globales autour de lui (en comptant les subdivisions) et si elles correspondent à un autre noeud du graphe, on ajoute une arête entre les deux
+        for dx, dy in directions:
+            other_position = (global_x + dx, global_y + dy)
+
+            if other_position not in nodes_by_position:
                 continue
 
-            for dx, dy in directions:
-                nx_, ny_ = x + dx, y + dy
+            other_node = nodes_by_position[other_position]
 
-                if nx_ < 0 or nx_ >= width or ny_ < 0 or ny_ >= height:
-                    continue
+            if dx == 0 or dy == 0:
+                weight = step
+            else:
+                weight = math.sqrt(2) * step
 
-                if (nx_, ny_) not in graph: # on relie seulement les cases qui sont dans le graphe, c'est à dire qui ne sont pas des buissons ou des trous
-                    continue
-
-                if dx == 0 or dy == 0:
-                    weight = TILE_SIZE
-                else:
-                    weight = math.sqrt(2) * TILE_SIZE # distance entre les centres de deux cases diagonales
-
-                graph.add_edge((x, y), (nx_, ny_), weight=weight) # on ajoute une arête entre les deux cases avec le poids correspondant à la distance entre leurs centres
+            graph.add_edge(node, other_node, weight=weight)
 
     return graph
 

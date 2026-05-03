@@ -2,6 +2,7 @@ from typing import Final
 import math
 import arcade
 import random
+import cProfile
 
 from constants import (
     TILE_SIZE,
@@ -42,7 +43,7 @@ class GameView(arcade.View):
 
     world_width: Final[int]
     world_height: Final[int]
-
+    profiler: cProfile.Profile
     player: Final[Player]
     player_list: Final[arcade.SpriteList[Player]]
     grounds: Final[arcade.SpriteList]
@@ -69,6 +70,7 @@ class GameView(arcade.View):
     def __init__(self, map: Map) -> None:
         # Magical incantion: initialize the Arcade view
         super().__init__()
+        self.profiler = cProfile.Profile()
         self.map = map
         self.player = Player()
         self.player.center_x = grid_to_pixels(map.player_start_x)
@@ -209,6 +211,7 @@ class GameView(arcade.View):
                         current_path=[],
                         path_index=0,
                         speed=1.0,
+                        target_node=None,
                     )
                     choose_new_destination(slime_info, self.rng, self.map)
                     self.slimes_info.append(slime_info)
@@ -385,11 +388,17 @@ class GameView(arcade.View):
             return
         self.player.on_key_release(symbol, modifiers)
 
+    def do_on_update(self, delta_time: float) -> None:
+        self.physics_engine.update()
+
     def on_update(self, delta_time: float) -> None:
         """Called once per frame, before drawing.
 
         This is where in-world time "advances", or "ticks".
         """
+        self.profiler.enable()
+        self.do_on_update(delta_time)
+        self.profiler.disable()
         self.physics_engine.update()
         self.crystals.update_animation()
         self.player.update_animation_state(delta_time)
@@ -413,7 +422,7 @@ class GameView(arcade.View):
              bat.cur_texture_index = (bat.cur_texture_index + 1) % len(bat.textures) # change la frame de l'animation pour faire bouger les ailes des chauves-souris
              bat.texture = bat.textures[bat.cur_texture_index]
 
-        update_slimes(self.slimes_info, self.rng, self.map, TILE_SIZE)
+        update_slimes(self.slimes_info, self.rng, self.map, TILE_SIZE, self.player, self.walls)
         for slime in self.slimes:
              slime.cur_texture_index = (slime.cur_texture_index + 1) % len(slime.textures) # change la frame de l'animation pour faire bouger les slimes
              slime.texture = slime.textures[slime.cur_texture_index]
