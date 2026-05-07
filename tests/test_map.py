@@ -11,18 +11,20 @@ from map import (
 
 def test_get_cell_basic() -> None:
     grid = (
-    (GridCell.BUSH, GridCell.CRYSTAL, GridCell.GRASS),
-    (GridCell.HOLE, GridCell.SPINNER_HORIZONTAL, GridCell.SPINNER_VERTICAL),
-    )
-    game_map = Map(
-    width=3,
-    height=2,
-    player_start_x=0,
-    player_start_y=0,
-    grid=grid,
-    navmesh=build_navmesh(3, 2, grid),
+        (GridCell.BUSH, GridCell.CRYSTAL, GridCell.GRASS),
+        (GridCell.HOLE, GridCell.SPINNER_HORIZONTAL, GridCell.SPINNER_VERTICAL),
     )
 
+    game_map = Map(
+        width=3,
+        height=2,
+        player_start_x=0,
+        player_start_y=0,
+        grid=grid,
+        navmesh=build_navmesh(3, 2, grid),
+        switches=(),
+        gates=(),
+    )
 
     assert game_map.get_cell(0, 0) == GridCell.HOLE
     assert game_map.get_cell(1, 0) == GridCell.SPINNER_HORIZONTAL
@@ -33,10 +35,11 @@ def test_get_cell_basic() -> None:
 
 
 def test_get_cell_out_of_bounds() -> None:
-    grid=(
-            (GridCell.GRASS, GridCell.GRASS),
-            (GridCell.GRASS, GridCell.GRASS),
-        )
+    grid = (
+        (GridCell.GRASS, GridCell.GRASS),
+        (GridCell.GRASS, GridCell.GRASS),
+    )
+
     game_map = Map(
         width=2,
         height=2,
@@ -44,6 +47,8 @@ def test_get_cell_out_of_bounds() -> None:
         player_start_y=0,
         grid=grid,
         navmesh=build_navmesh(2, 2, grid),
+        switches=(),
+        gates=(),
     )
 
     with pytest.raises(IndexError):
@@ -83,6 +88,106 @@ xxxxx
     assert game_map.get_cell(1, 1) == GridCell.SPINNER_HORIZONTAL
     assert game_map.get_cell(2, 1) == GridCell.SPINNER_VERTICAL
     assert game_map.get_cell(3, 1) == GridCell.HOLE
+
+    assert game_map.switches == ()
+    assert game_map.gates == ()
+
+
+def test_load_map_with_switch_and_gate() -> None:
+    content = """width: 8
+height: 4
+switches:
+  - id: first
+    x: 3
+    y: 1
+    state: off
+gates:
+  - x: 5
+    y: 1
+    open_if:
+      switch_is_on: first
+---
+xxxxxxxx
+x      x
+x P^ | x
+xxxxxxxx
+---
+"""
+
+    game_map = load_map_from_string(content)
+
+    assert len(game_map.switches) == 1
+    assert game_map.switches[0].id == "first"
+    assert game_map.switches[0].x == 3
+    assert game_map.switches[0].y == 1
+    assert game_map.switches[0].is_on is False
+
+    assert len(game_map.gates) == 1
+    assert game_map.gates[0].x == 5
+    assert game_map.gates[0].y == 1
+    assert game_map.gates[0].open_if == {"switch_is_on": "first"}
+
+
+def test_load_map_with_switch_initially_on() -> None:
+    content = """width: 6
+height: 4
+switches:
+  - id: first
+    x: 3
+    y: 1
+    state: on
+---
+xxxxxx
+x    x
+x P^ x
+xxxxxx
+---
+"""
+
+    game_map = load_map_from_string(content)
+
+    assert len(game_map.switches) == 1
+    assert game_map.switches[0].is_on is True
+
+
+def test_switch_config_must_match_grid_symbol() -> None:
+    content = """width: 6
+height: 4
+switches:
+  - id: first
+    x: 3
+    y: 1
+    state: off
+---
+xxxxxx
+x    x
+x P  x
+xxxxxx
+---
+"""
+
+    with pytest.raises(InvalidMapFileException):
+        load_map_from_string(content)
+
+
+def test_gate_config_must_match_grid_symbol() -> None:
+    content = """width: 6
+height: 4
+gates:
+  - x: 3
+    y: 1
+    open_if:
+      switch_is_on: first
+---
+xxxxxx
+x    x
+x P  x
+xxxxxx
+---
+"""
+
+    with pytest.raises(InvalidMapFileException):
+        load_map_from_string(content)
 
 
 def test_load_map_requires_exactly_one_player() -> None:
@@ -218,18 +323,20 @@ xP
 xxxxx
 ---
 """
+
     game_map = load_map_from_string(content)
 
     assert game_map.get_cell(2, 1) == GridCell.GRASS
     assert game_map.get_cell(3, 1) == GridCell.GRASS
     assert game_map.get_cell(4, 1) == GridCell.GRASS
 
-def test_build_navmesh_excludes_bush_and_hole() -> None:
+
+def test_build_navmesh_excludes_bush_hole_and_gate() -> None:
     width = 3
     height = 3
     grid = [
         [GridCell.GRASS, GridCell.GRASS, GridCell.GRASS],
-        [GridCell.GRASS, GridCell.BUSH, GridCell.GRASS],
+        [GridCell.GRASS, GridCell.BUSH, GridCell.GATE],
         [GridCell.GRASS, GridCell.HOLE, GridCell.GRASS],
     ]
     grid_tuple = tuple(tuple(row) for row in grid)
@@ -238,5 +345,6 @@ def test_build_navmesh_excludes_bush_and_hole() -> None:
 
     assert all(node[0:2] != (1, 1) for node in navmesh)
     assert all(node[0:2] != (1, 0) for node in navmesh)
+    assert all(node[0:2] != (2, 1) for node in navmesh)
     assert any(node[0:2] == (0, 0) for node in navmesh)
     assert any(node[0:2] == (2, 2) for node in navmesh)

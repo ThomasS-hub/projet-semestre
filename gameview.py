@@ -21,6 +21,8 @@ from textures import (
     SOUND_COIN,
     BAT_TEXTURES,
     SLIME_TEXTURES,
+    TEXTURE_SWITCH_OFF,
+    TEXTURE_GATE_CLOSED,
 )
 from map import Map, GridCell
 from player import Player
@@ -29,6 +31,7 @@ from spinner import SpinnerInfo, spinner_horizontal_limits, spinner_vertical_lim
 from camera import update_camera
 from bats import BatInfo, update_bats
 from slimes import SlimeInfo, slime_possible_destinations, choose_new_destination, update_slimes
+from gate import GateInfo, SwitchInfo, update_all_gates, update_switch_texture
 
 LEFT_MARGIN = 200
 RIGHT_MARGIN = 200
@@ -61,7 +64,10 @@ class GameView(arcade.View):
     ui_camera: Final[arcade.camera.Camera2D]
     score: int
     score_text: arcade.Text
-
+    switches: Final[arcade.SpriteList]
+    gates: Final[arcade.SpriteList]
+    switches_info: list[SwitchInfo]
+    gates_info: list[GateInfo]
 
     physics_engine: Final[arcade.PhysicsEngineSimple]
     camera: Final[arcade.camera.Camera2D]
@@ -96,6 +102,10 @@ class GameView(arcade.View):
             color=arcade.color.WHITE,
             font_size=20,
         )
+        self.switches = arcade.SpriteList()
+        self.gates = arcade.SpriteList()
+        self.switches_info = []
+        self.gates_info = []
 
         self.weapon_icon = arcade.Sprite(scale=2) #creer un sprite pour afficher l'arme
         self.weapon_icon.center_x = 50
@@ -216,6 +226,35 @@ class GameView(arcade.View):
                     choose_new_destination(slime_info, self.rng, self.map)
                     self.slimes_info.append(slime_info)
 
+        for switch_config in self.map.switches:
+            switch = arcade.Sprite(TEXTURE_SWITCH_OFF, scale=0.25)
+            switch.center_x = grid_to_pixels(switch_config.x)
+            switch.center_y = grid_to_pixels(switch_config.y)
+            self.switches.append(switch)
+
+            switch_info = SwitchInfo(
+                id=switch_config.id,
+                sprite=switch,
+                is_on=switch_config.is_on,
+            )
+            update_switch_texture(switch_info)
+            self.switches_info.append(switch_info)
+
+        for gate_config in self.map.gates:
+            gate = arcade.Sprite(TEXTURE_GATE_CLOSED, scale=SCALE)
+            gate.center_x = grid_to_pixels(gate_config.x)
+            gate.center_y = grid_to_pixels(gate_config.y)
+            self.gates.append(gate)
+
+            self.gates_info.append(
+                GateInfo(
+                    sprite=gate,
+                    condition=gate_config.open_if,
+                    is_open=False,
+                )
+            )
+        update_all_gates(self.gates_info, self.switches_info, self.walls)
+
         self.physics_engine = arcade.PhysicsEngineSimple(self.player, self.walls)
         self.camera = arcade.camera.Camera2D()
 
@@ -241,7 +280,7 @@ class GameView(arcade.View):
         if grid_x < 0 or grid_x >= self.map.width or grid_y < 0 or grid_y >= self.map.height:
             return True
 
-        return self.map.get_cell(grid_x, grid_y) == GridCell.BUSH
+        return len(arcade.check_for_collision_with_list(self.weapon.sprite, self.walls)) > 0
 
     def check_boomerang_hits_monsters(self) -> bool:
         hit_something = False
@@ -320,6 +359,19 @@ class GameView(arcade.View):
                         self.slimes_info.remove(slime_info)
                         break
 
+    def check_weapon_hits_switches(self) -> bool:
+        if self.weapon.has_hit_switch:
+            return False
+
+        for switch_info in self.switches_info:
+            if arcade.check_for_collision(self.weapon.sprite, switch_info.sprite):
+                self.weapon.has_hit_switch = True
+                switch_info.is_on = not switch_info.is_on
+                update_switch_texture(switch_info)
+                update_all_gates(self.gates_info, self.switches_info, self.walls)
+                return True
+
+        return False
 
     def update_weapon_icon(self) -> None: # determine quel arme affiché
         if self.weapon.weapon_type == WeaponType.BOOMERANG:
@@ -353,6 +405,8 @@ class GameView(arcade.View):
                 self.spinners.draw()
                 self.bats.draw()
                 self.slimes.draw()
+                self.gates.draw()
+                self.switches.draw()
                 if self.weapon.is_active():
                     arcade.draw_sprite(self.weapon.sprite)
                 if not (self.weapon.weapon_type == WeaponType.EPEE and self.weapon.state == WeaponState.ACTIVE): # permet l'affichage du joeur ssi l'épée est inacivité
@@ -364,6 +418,7 @@ class GameView(arcade.View):
             self.weapon_icon.center_x = 60
             self.weapon_icon.center_y = self.window.height - 60
             arcade.draw_sprite(self.weapon_icon)
+
 
     def on_key_press(self, symbol: int, modifiers: int) -> None:
         if symbol == arcade.key.ESCAPE:
@@ -388,18 +443,14 @@ class GameView(arcade.View):
             return
         self.player.on_key_release(symbol, modifiers)
 
-    def do_on_update(self, delta_time: float) -> None:
-        self.physics_engine.update()
-
     def on_update(self, delta_time: float) -> None:
         """Called once per frame, before drawing.
 
         This is where in-world time "advances", or "ticks".
         """
         self.profiler.enable()
-        self.do_on_update(delta_time)
-        self.profiler.disable()
         self.physics_engine.update()
+        self.profiler.disable()
         self.crystals.update_animation()
         self.player.update_animation_state(delta_time)
         update_camera(self.camera, self.player, self.window, self.world_width, self.world_height)
@@ -431,7 +482,9 @@ class GameView(arcade.View):
             if self.weapon.state == WeaponState.LAUNCHING:
                 self.weapon.update_launching()
 
-                if self.check_boomerang_hits_monsters():
+                if self.check_weapon_hits_switches():
+                    self.weapon.switch_to_returning()
+                elif self.check_boomerang_hits_monsters():
                     self.weapon.switch_to_returning()
                 elif self.boomerang_hits_bush():
                     self.weapon.switch_to_returning()
@@ -441,6 +494,7 @@ class GameView(arcade.View):
             elif self.weapon.state == WeaponState.RETURNING:
                 self.weapon.update_returning(self.player.center_x, self.player.center_y)
 
+                self.check_weapon_hits_switches()
                 self.check_boomerang_hits_monsters()
 
                 if self.weapon.is_close_to_player(self.player.center_x, self.player.center_y):
@@ -448,6 +502,7 @@ class GameView(arcade.View):
         elif self.weapon.weapon_type == WeaponType.EPEE:
             if self.weapon.state == WeaponState.ACTIVE:
                 self.weapon.update_epee(delta_time)
+                self.check_weapon_hits_switches()
                 self.check_epee_hits()
 
         collisions = arcade.check_for_collision_with_list(self.player, self.spinners)

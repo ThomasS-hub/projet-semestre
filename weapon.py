@@ -47,6 +47,8 @@ class Weapon:
         self.set_scale()
         self.set_boomerang_textures()
 
+        self.has_hit_switch = False
+
 
     def set_weapon_type(self, weapon_type: WeaponType) -> None:
         self.weapon_type = weapon_type
@@ -125,6 +127,8 @@ class Weapon:
 
         self.set_epee_textures(direction)
 
+        self.has_hit_switch = False
+
     def update_epee(self, delta_time: float) -> None:
         self.time += delta_time
         index = int(self.time / 0.05) # temps écoulé / durée d'une frame = numéro de la frame (image a afficher)
@@ -145,6 +149,8 @@ class Weapon:
 
         self.dx, self.dy = direction.to_vector() # permet de cree le vectuer de deplacement reutiliser dans update_launching pour savoir dans quelle direction aller
         self.set_boomerang_textures()
+
+        self.has_hit_switch = False
 
     def update_launching(self) -> None:
         self.sprite.center_x += self.dx * self.speed

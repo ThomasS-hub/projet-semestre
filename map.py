@@ -4,6 +4,8 @@ from typing import Final
 import math
 import networkx as nx
 from constants import TILE_SIZE
+from typing import Any
+import yaml
 
 type NavNode = tuple[int, int, int, int] # type pour représenter une position de grille dans le graphe de navigation
 
@@ -17,7 +19,22 @@ class GridCell(Enum): # meme chose changer le enum car ce n'est pas un enum ici
     HOLE = 5
     BAT = 6
     SLIME = 7
+    SWITCH = 8
+    GATE = 9
 
+@dataclass(frozen=True)
+class SwitchConfig:
+    id: str
+    x: int
+    y: int
+    is_on: bool
+
+
+@dataclass(frozen=True)
+class GateConfig:
+    x: int
+    y: int
+    open_if: dict[str, Any]
 
 @dataclass(frozen=True)
 class Map:
@@ -27,6 +44,8 @@ class Map:
     player_start_y: int
     grid: tuple[tuple[GridCell, ...], ...]
     navmesh: nx.Graph[NavNode]
+    switches: tuple[SwitchConfig, ...]
+    gates: tuple[GateConfig, ...]
 
     def get_cell(self, x: int, y: int) -> GridCell:
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -70,7 +89,7 @@ def build_navmesh(width: int,height: int,grid: tuple[tuple[GridCell, ...], ...],
 
     for x in range(width):
         for y in range(height):
-            if get_cell(x, y) in {GridCell.BUSH, GridCell.HOLE}:
+            if get_cell(x, y) in {GridCell.BUSH, GridCell.HOLE, GridCell.GATE}:
                 continue
 
             for sx in range(density):
@@ -122,45 +141,26 @@ def load_map_from_file(filename: str) -> Map:
 def load_map_from_string(content: str) -> Map:
     lines = content.splitlines()
 
-    if len(lines) < 4:
-        raise InvalidMapFileException("fichier trop court")
-
-    width = None
-    height = None
-    i = 0
-
-    while i < len(lines) and lines[i] != "---":
-        line = lines[i].strip()
-
-        if ":" not in line:
-            raise InvalidMapFileException("ligne de configuration invalide")
-
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
-
-        if key == "width":
-            if not value.isdigit() or int(value) <= 0:
-                raise InvalidMapFileException("width invalide")
-            width = int(value)
-
-        elif key == "height":
-            if not value.isdigit() or int(value) <= 0:
-                raise InvalidMapFileException("height invalide")
-            height = int(value)
-
-        else:
-            raise InvalidMapFileException(f"clé inconnue: {key}")
-
-        i += 1
-
-    if width is None or height is None:
-        raise InvalidMapFileException("width ou height manquant")
-
-    if i >= len(lines) or lines[i] != "---":
+    if "---" not in lines:
         raise InvalidMapFileException("séparateur de début manquant")
 
-    i += 1
+    first_separator = lines.index("---")
+    config_text = "\n".join(lines[:first_separator])
+    config = yaml.safe_load(config_text)
+
+    if not isinstance(config, dict):
+        raise InvalidMapFileException("configuration invalide")
+
+    width = config.get("width")
+    height = config.get("height")
+
+    if not isinstance(width, int) or width <= 0:
+        raise InvalidMapFileException("width invalide")
+
+    if not isinstance(height, int) or height <= 0:
+        raise InvalidMapFileException("height invalide")
+
+    i = first_separator + 1
 
     if i + height > len(lines):
         raise InvalidMapFileException("pas assez de lignes pour la carte")
@@ -180,6 +180,8 @@ def load_map_from_string(content: str) -> Map:
         "O": GridCell.HOLE,
         "v": GridCell.BAT,
         "m": GridCell.SLIME,
+        "^": GridCell.SWITCH,
+        "|": GridCell.GATE,
     }
 
     player_start_x = None
@@ -213,15 +215,55 @@ def load_map_from_string(content: str) -> Map:
     assert player_start_x is not None
     assert player_start_y is not None
 
+    grid_tuple = tuple(grid_rows)
+
+    switch_configs: list[SwitchConfig] = []
+
+    for raw_switch in config.get("switches", []):
+        switch_id = raw_switch["id"]
+        x = raw_switch["x"]
+        y = raw_switch["y"]
+        state = raw_switch.get("state", "off")
+
+        if grid_tuple[height - 1 - y][x] != GridCell.SWITCH:
+            raise InvalidMapFileException("switch déclaré mais pas de ^ à cette position")
+
+        switch_configs.append(
+            SwitchConfig(
+                id=switch_id,
+                x=x,
+                y=y,
+                is_on=state == "on",
+            )
+        )
+
+    gate_configs: list[GateConfig] = []
+
+    for raw_gate in config.get("gates", []):
+        x = raw_gate["x"]
+        y = raw_gate["y"]
+
+        if grid_tuple[height - 1 - y][x] != GridCell.GATE:
+            raise InvalidMapFileException("gate déclarée mais pas de | à cette position")
+
+        gate_configs.append(
+            GateConfig(
+                x=x,
+                y=y,
+                open_if=raw_gate["open_if"],
+            )
+        )
+
     return Map(
         width=width,
         height=height,
-        player_start_x = player_start_x,
-        player_start_y = player_start_y,
-        grid=tuple(grid_rows),
-        navmesh=build_navmesh(width, height, tuple(grid_rows)),
+        player_start_x=player_start_x,
+        player_start_y=player_start_y,
+        grid=grid_tuple,
+        navmesh=build_navmesh(width, height, grid_tuple),
+        switches=tuple(switch_configs),
+        gates=tuple(gate_configs),
     )
-
 
 def _make_map_decouverte() -> Map:
     width = 40
@@ -253,6 +295,8 @@ def _make_map_decouverte() -> Map:
         player_start_y=2,
         grid=grid_tuples,
         navmesh=build_navmesh(width, height, grid_tuples),
+        switches=(),
+        gates=(),
     )
 
 

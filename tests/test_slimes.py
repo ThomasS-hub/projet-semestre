@@ -27,6 +27,8 @@ def make_map(
         player_start_y=0,
         grid=grid_tuple,
         navmesh=build_navmesh(width, height, grid_tuple),
+        switches=(),
+        gates=(),
     )
 
 

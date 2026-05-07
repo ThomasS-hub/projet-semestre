@@ -164,3 +164,13 @@ SLIME_ANIM: Final[arcade.TextureAnimation] = _load_animation_strip(asset_path("a
     frame_count=6,
 )
 SLIME_TEXTURES = [kf.texture for kf in SLIME_ANIM.keyframes]
+TEXTURE_SWITCH_OFF = arcade.load_texture(":resources:images/tiles/leverLeft.png")
+TEXTURE_SWITCH_ON = arcade.load_texture(":resources:images/tiles/leverRight.png")
+_dungeon_grid = _load_grid(
+    asset_path("assets/Top_Down_Adventure_Pack_v.1.0/Dungeon_Tileset.png"),
+    13,
+    12,
+)
+
+TEXTURE_GATE_OPEN: Final[arcade.Texture] = _dungeon_grid[8 * 13 + 4]
+TEXTURE_GATE_CLOSED: Final[arcade.Texture] = _dungeon_grid[8 * 13 + 7]
